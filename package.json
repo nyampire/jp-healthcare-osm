@@ -1,0 +1,25 @@
+{
+  "name": "osm-iryo-joho",
+  "version": "0.1.0",
+  "private": true,
+  "description": "医療情報ネット オープンデータを OSM 向けに変換する作業リポジトリ",
+  "scripts": {
+    "build:hospital": "python3 scripts/build_opening_hours.py --sector hospital && python3 scripts/build_speciality.py --sector hospital && python3 scripts/build_names.py --sector hospital",
+    "validate:hospital": "node scripts/validate_opening_hours.js output/hospital_opening_hours.csv && python3 scripts/validate_speciality.py output/hospital_speciality.csv && python3 scripts/validate_names.py output/hospital_names.csv",
+    "build:clinic": "python3 scripts/build_opening_hours.py --sector clinic && python3 scripts/build_speciality.py --sector clinic && python3 scripts/build_names.py --sector clinic",
+    "validate:clinic": "node scripts/validate_opening_hours.js output/clinic_opening_hours.csv && python3 scripts/validate_speciality.py output/clinic_speciality.csv && python3 scripts/validate_names.py output/clinic_names.csv",
+    "build:dental": "python3 scripts/build_opening_hours.py --sector dental && python3 scripts/build_speciality.py --sector dental && python3 scripts/build_names.py --sector dental",
+    "validate:dental": "node scripts/validate_opening_hours.js output/dental_opening_hours.csv && python3 scripts/validate_speciality.py output/dental_speciality.csv && python3 scripts/validate_names.py output/dental_names.csv",
+    "build:maternity": "python3 scripts/build_opening_hours.py --sector maternity && python3 scripts/build_names.py --sector maternity",
+    "validate:maternity": "node scripts/validate_opening_hours.js output/maternity_opening_hours.csv && python3 scripts/validate_names.py output/maternity_names.csv",
+    "build:pharmacy": "python3 scripts/build_opening_hours.py --sector pharmacy && python3 scripts/build_names.py --sector pharmacy",
+    "validate:pharmacy": "node scripts/validate_opening_hours.js output/pharmacy_opening_hours.csv && python3 scripts/validate_names.py output/pharmacy_names.csv",
+    "build": "npm run build:hospital && npm run build:clinic && npm run build:dental && npm run build:maternity && npm run build:pharmacy",
+    "validate": "npm run validate:hospital && npm run validate:clinic && npm run validate:dental && npm run validate:maternity && npm run validate:pharmacy",
+    "selftest": "node scripts/selftest.js",
+    "all": "npm run build && npm run selftest && npm run validate"
+  },
+  "dependencies": {
+    "opening_hours": "^3.14.0"
+  }
+}

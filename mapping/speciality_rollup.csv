@@ -1,0 +1,23 @@
+値,畳み先,備考
+abdominal_surgery,surgery,外科の細分。neurosurgery/orthopaedics/paediatric_surgery は主要科として畳まない
+cardiothoracic_surgery,surgery,外科の細分
+vascular_surgery,surgery,外科の細分
+transplant,surgery,外科の細分
+proctology,surgery,外科の細分
+plastic_surgery,surgery,外科の細分
+hepatology,gastroenterology,消化器の細分
+dialysis,nephrology,腎臓の細分。wiki未文書化値でもあるため畳む優先度は高い
+endocrinology,internal,内科の細分。cardiology/gastroenterology/nephrology/neurology/pulmonology/oncology は主要科として畳まない
+infectious_diseases,internal,内科の細分
+haematology,internal,内科の細分
+geriatrics,internal,内科の細分
+allergology,internal,内科の細分
+diagnostic_radiology,radiology,放射線科の細分
+radiotherapy,radiology,放射線科の細分
+nuclear,radiology,放射線科の細分
+clinical_pathology,pathology,病理の細分
+orthodontics,dentistry,歯科の細分
+paediatric_dentistry,dentistry,歯科の細分
+dental_oral_maxillo_facial_surgery,dentistry,歯科の細分
+child_psychiatry,psychiatry,精神科の細分
+neuropsychiatry,psychiatry,精神科の細分

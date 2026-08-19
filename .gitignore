@@ -1,0 +1,19 @@
+# 依存パッケージ
+node_modules/
+
+# 元データ（厚生労働省の配布元から再取得できるため追跡しない）
+# 02-2 は 129MB、03-2 は 83MB あり GitHub の 100MB 制限にも掛かる。
+# 取得元は README を参照。
+0*-*_*.csv
+0*_*.csv
+*.xlsx
+
+# 生成物（npm run all で再現できるため追跡しない）
+output/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
