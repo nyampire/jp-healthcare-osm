@@ -21,60 +21,72 @@
 ひとつの OSM 値に複数の診療科が集まる場合があります。
 どこで情報が粗くなっているかは、この向きで見ると分かります。
 
-| healthcare:speciality | 集まる診療科 |
-|---|---|
-| `abdominal_surgery` | 消化器外科（丸め）、消化器・移植外科（丸め）、胃腸外科（丸め）、肝臓外科（丸め）、膵臓外科（丸め）、胆のう外科（丸め）、肝臓・胆のう・膵臓外科（丸め）、腹部外科 |
-| `otolaryngology` | 気管食道内科（丸め）、気管食道外科（丸め）、頭頸部外科（丸め）、小児耳鼻いんこう科（丸め）、耳鼻いんこう科、気管食道・耳鼻いんこう科、頭頸部・耳鼻いんこう科、耳鼻咽喉科・頭頸部外科 |
-| `surgery` | 外科、食道外科（丸め）、乳腺外科（丸め）、乳腺・内分泌外科（丸め）、女性乳腺外科（丸め）、内視鏡外科（丸め）、移植・内視鏡外科（丸め）、その他（外科系）（丸め） |
-| `urology` | 腎臓外科（丸め）、小児泌尿器科（丸め）、皮膚泌尿器科、泌尿器科、男性泌尿器科（丸め）、神経泌尿器科（丸め）、腎臓・泌尿器科、女性泌尿器科（丸め） |
-| `endocrinology` | 糖尿病内科、代謝内科（丸め）、内分泌内科、脂質代謝内科（丸め）、糖尿病・内分泌内科、糖尿病・代謝内科、代謝・内分泌内科 |
-| `paediatrics` | 小児科、小児眼科（丸め）、小児耳鼻いんこう科（丸め）、小児皮膚科（丸め）、小児泌尿器科（丸め）、小児神経科（丸め） |
-| `cardiothoracic_surgery` | 呼吸器外科（丸め）、循環器外科（丸め）、心臓外科、心臓血管外科、胸部外科（丸め） |
-| `dermatology` | 小児皮膚科（丸め）、皮膚科、美容皮膚科（丸め）、皮膚泌尿器科、皮膚腫瘍科（丸め） |
-| `gynaecology` | 産婦人科、産科、婦人科、産婦人科（生殖医療）、女性診療科（丸め） |
-| `psychiatry` | 精神科、神経科（丸め）、心療内科（丸め）、老年精神科、老年心療内科（丸め） |
-| `geriatrics` | 老年・呼吸器内科、老年内科、老年精神科、老年心療内科（丸め） |
-| `oncology` | 血液・腫瘍内科、腫瘍内科、腫瘍外科（丸め）、小児腫瘍外科（丸め） |
-| `anaesthetics` | ペインクリニック内科（丸め）、ペインクリニック外科（丸め）、麻酔科 |
-| `cardiology` | 循環器内科、心臓内科、心臓血管内科 |
-| `gastroenterology` | 消化器内科、胃腸内科、内視鏡内科（丸め） |
-| `internal` | 内科、女性内科（丸め）、インフルエンザ（丸め） |
-| `neurosurgery` | 脳神経外科、脳外科、脳・血管外科（丸め） |
-| `ophthalmology` | 小児眼科（丸め）、眼科、神経眼科（丸め） |
-| `palliative` | 疼痛緩和内科（丸め）、緩和ケア内科、緩和ケア外科（丸め） |
-| `proctology` | 大腸外科（丸め）、肛門外科、大腸・肛門外科 |
-| `transplant` | 消化器・移植外科（丸め）、移植外科、移植・内視鏡外科（丸め） |
-| `allergology` | アレルギー疾患内科、アレルギー科 |
-| `dental_oral_maxillo_facial_surgery` | 歯科口腔外科、口腔腫瘍外科（丸め） |
-| `haematology` | 血液・腫瘍内科、血液内科 |
-| `nephrology` | 腎臓内科、腎臓・泌尿器科 |
-| `neurology` | 脳神経内科、神経内科 |
-| `orthodontics` | 矯正歯科、小児矯正歯科 |
-| `paediatric_dentistry` | 小児歯科、小児矯正歯科 |
-| `paediatric_surgery` | 小児外科、小児腫瘍外科（丸め） |
-| `plastic_surgery` | 形成外科、美容外科（丸め） |
-| `pulmonology` | 呼吸器内科、老年・呼吸器内科 |
-| `radiotherapy` | 放射線治療科、腫瘍放射線科 |
-| `child_psychiatry` | 児童精神科 |
-| `clinical_pathology` | 臨床検査科 |
-| `dentistry` | 歯科 |
-| `diagnostic_radiology` | 放射線診断科 |
-| `dialysis` | 人工透析内科 |
-| `emergency` | 救急科 |
-| `fertility` | 産婦人科（生殖医療） |
-| `general` | 総合診療科（丸め） |
-| `hepatology` | 肝臓内科 |
-| `infectious_diseases` | 感染症内科 |
-| `neonatology` | 新生児内科 |
-| `neuropsychiatry` | 神経精神科（丸め） |
-| `orthopaedics` | 整形外科 |
-| `pathology` | 病理診断科 |
-| `physiatry` | リハビリテーション科 |
-| `radiology` | 放射線科 |
-| `rheumatology` | リウマチ科 |
-| `traditional_chinese_medicine` | 漢方内科（丸め） |
-| `vascular_surgery` | 血管外科 |
-| `venereology` | 性感染症内科 |
+左の列は、その OSM 値が本来指す診療科です（確度 `exact`）。
+右の列は、対応する値が無いため、やむを得ずその値へ寄せた診療科です（確度 `broader`）。
+右の列に入った診療科は、OSM 側では左の列の診療科と区別が付きません。
+
+たとえば `gastroenterology` の行はこう読みます。
+消化器内科と胃腸内科は、この値が本来指す診療科です。
+内視鏡内科には対応する値が無いため、この値へ寄せました。
+その結果、内視鏡内科だけを持つ施設と消化器内科を持つ施設は、
+タグの上では同じ `gastroenterology` になります。
+
+右の列が空の行は、寄せた診療科が無く、情報が粗くなっていません。
+
+| healthcare:speciality | 本来指す診療科 | 寄せた診療科 |
+|---|---|---|
+| `abdominal_surgery` | 腹部外科 | 消化器外科、消化器・移植外科、胃腸外科、肝臓外科、膵臓外科、胆のう外科、肝臓・胆のう・膵臓外科 |
+| `otolaryngology` | 耳鼻いんこう科、気管食道・耳鼻いんこう科、頭頸部・耳鼻いんこう科、耳鼻咽喉科・頭頸部外科 | 気管食道内科、気管食道外科、頭頸部外科、小児耳鼻いんこう科 |
+| `surgery` | 外科 | 食道外科、乳腺外科、乳腺・内分泌外科、女性乳腺外科、内視鏡外科、移植・内視鏡外科、その他（外科系） |
+| `urology` | 皮膚泌尿器科、泌尿器科、腎臓・泌尿器科 | 腎臓外科、小児泌尿器科、男性泌尿器科、神経泌尿器科、女性泌尿器科 |
+| `endocrinology` | 糖尿病内科、内分泌内科、糖尿病・内分泌内科、糖尿病・代謝内科、代謝・内分泌内科 | 代謝内科、脂質代謝内科 |
+| `paediatrics` | 小児科 | 小児眼科、小児耳鼻いんこう科、小児皮膚科、小児泌尿器科、小児神経科 |
+| `cardiothoracic_surgery` | 心臓外科、心臓血管外科 | 呼吸器外科、循環器外科、胸部外科 |
+| `dermatology` | 皮膚科、皮膚泌尿器科 | 小児皮膚科、美容皮膚科、皮膚腫瘍科 |
+| `gynaecology` | 産婦人科、産科、婦人科、産婦人科（生殖医療） | 女性診療科 |
+| `psychiatry` | 精神科、老年精神科 | 神経科、心療内科、老年心療内科 |
+| `geriatrics` | 老年・呼吸器内科、老年内科、老年精神科 | 老年心療内科 |
+| `oncology` | 血液・腫瘍内科、腫瘍内科 | 腫瘍外科、小児腫瘍外科 |
+| `anaesthetics` | 麻酔科 | ペインクリニック内科、ペインクリニック外科 |
+| `cardiology` | 循環器内科、心臓内科、心臓血管内科 |  |
+| `gastroenterology` | 消化器内科、胃腸内科 | 内視鏡内科 |
+| `internal` | 内科 | 女性内科、インフルエンザ |
+| `neurosurgery` | 脳神経外科、脳外科 | 脳・血管外科 |
+| `ophthalmology` | 眼科 | 小児眼科、神経眼科 |
+| `palliative` | 緩和ケア内科 | 疼痛緩和内科、緩和ケア外科 |
+| `proctology` | 肛門外科、大腸・肛門外科 | 大腸外科 |
+| `transplant` | 移植外科 | 消化器・移植外科、移植・内視鏡外科 |
+| `allergology` | アレルギー疾患内科、アレルギー科 |  |
+| `dental_oral_maxillo_facial_surgery` | 歯科口腔外科 | 口腔腫瘍外科 |
+| `haematology` | 血液・腫瘍内科、血液内科 |  |
+| `nephrology` | 腎臓内科、腎臓・泌尿器科 |  |
+| `neurology` | 脳神経内科、神経内科 |  |
+| `orthodontics` | 矯正歯科、小児矯正歯科 |  |
+| `paediatric_dentistry` | 小児歯科、小児矯正歯科 |  |
+| `paediatric_surgery` | 小児外科 | 小児腫瘍外科 |
+| `plastic_surgery` | 形成外科 | 美容外科 |
+| `pulmonology` | 呼吸器内科、老年・呼吸器内科 |  |
+| `radiotherapy` | 放射線治療科、腫瘍放射線科 |  |
+| `child_psychiatry` | 児童精神科 |  |
+| `clinical_pathology` | 臨床検査科 |  |
+| `dentistry` | 歯科 |  |
+| `diagnostic_radiology` | 放射線診断科 |  |
+| `dialysis` | 人工透析内科 |  |
+| `emergency` | 救急科 |  |
+| `fertility` | 産婦人科（生殖医療） |  |
+| `general` |  | 総合診療科 |
+| `hepatology` | 肝臓内科 |  |
+| `infectious_diseases` | 感染症内科 |  |
+| `neonatology` | 新生児内科 |  |
+| `neuropsychiatry` |  | 神経精神科 |
+| `orthopaedics` | 整形外科 |  |
+| `pathology` | 病理診断科 |  |
+| `physiatry` | リハビリテーション科 |  |
+| `radiology` | 放射線科 |  |
+| `rheumatology` | リウマチ科 |  |
+| `traditional_chinese_medicine` |  | 漢方内科 |
+| `vascular_surgery` | 血管外科 |  |
+| `venereology` | 性感染症内科 |  |
 
 ## コードから見た一覧
 
