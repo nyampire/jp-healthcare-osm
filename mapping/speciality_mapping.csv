@@ -54,7 +54,7 @@
 ,02019,膵臓外科,15,1,abdominal_surgery,broader,wiki,
 ,02020,胆のう外科,20,1,abdominal_surgery,broader,wiki,
 ,02021,肝臓・胆のう・膵臓外科,63,1,abdominal_surgery,broader,wiki,
-,02022,乳腺外科,973,1,surgery,broader,wiki,乳腺外科に対応する値が無い。973施設と多く要検討
+,02022,乳腺外科,973,1,surgery,broader,wiki,乳腺外科に対応する値が無い。影響施設が多く要検討
 ,02023,乳腺・内分泌外科,123,1,surgery,broader,wiki,乳腺外科に対応する値が無い
 ,02024,女性乳腺外科,10,1,surgery,broader,wiki,乳腺外科に対応する値が無い
 ,02025,肛門外科,887,1,proctology,exact,wiki,
@@ -103,7 +103,7 @@
 ,06992,女性泌尿器科,22,9,urology,broader,wiki,
 ,07001,精神科,2606,1,psychiatry,exact,wiki,
 ,07002,神経科,356,1,psychiatry,broader,wiki,コード体系上07は精神科系。神経内科ではない
-,07003,心療内科,1097,1,psychiatry,broader,wiki,心療内科（心身医学）に対応する値が無い。1097施設と多く要検討
+,07003,心療内科,1097,1,psychiatry,broader,wiki,心療内科（心身医学）に対応する値が無い。影響施設が多く要検討
 ,07004,老年精神科,107,1,psychiatry;geriatrics,exact,wiki,
 ,07005,老年心療内科,6,1,psychiatry;geriatrics,broader,wiki,
 ,07991,神経精神科,67,29,neuropsychiatry,broader,wiki,「その他（精神科系）」の総括コード

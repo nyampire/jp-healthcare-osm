@@ -54,6 +54,10 @@ PDL1.0 は「編集・加工した情報を、あたかも国又は府省等が�
 
 変換処理の設計と、各判断の根拠となる実測値は [docs/processing.md](docs/processing.md) にあります。
 
+診療科目コードと `healthcare:speciality` の対応は
+[docs/speciality-mapping.md](docs/speciality-mapping.md) に一覧があります。
+127コードすべてと、どの診療科がどの値に集まるかの逆引きを載せています。
+
 ## 使い方
 
 ```bash

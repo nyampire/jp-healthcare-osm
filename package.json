@@ -15,6 +15,7 @@
     "build:pharmacy": "python3 scripts/build_opening_hours.py --sector pharmacy && python3 scripts/build_names.py --sector pharmacy",
     "validate:pharmacy": "node scripts/validate_opening_hours.js output/pharmacy_opening_hours.csv && python3 scripts/validate_names.py output/pharmacy_names.csv",
     "build": "npm run build:hospital && npm run build:clinic && npm run build:dental && npm run build:maternity && npm run build:pharmacy",
+    "docs": "python3 scripts/build_speciality_doc.py",
     "validate": "npm run validate:hospital && npm run validate:clinic && npm run validate:dental && npm run validate:maternity && npm run validate:pharmacy",
     "selftest": "node scripts/selftest.js",
     "all": "npm run build && npm run selftest && npm run validate"
