@@ -15,6 +15,7 @@
     "build:pharmacy": "python3 scripts/build_opening_hours.py --sector pharmacy && python3 scripts/build_names.py --sector pharmacy && node scripts/geocode_missing.js --sector pharmacy && python3 scripts/build_osm.py --sector pharmacy",
     "validate:pharmacy": "node scripts/validate_opening_hours.js output/pharmacy_opening_hours.csv && python3 scripts/validate_names.py output/pharmacy_names.csv && python3 scripts/validate_osm.py output/pharmacy_osm",
     "build": "npm run build:hospital && npm run build:clinic && npm run build:dental && npm run build:maternity && npm run build:pharmacy",
+    "maproulette": "python3 scripts/build_maproulette.py",
     "validate": "npm run validate:hospital && npm run validate:clinic && npm run validate:dental && npm run validate:maternity && npm run validate:pharmacy",
     "docs": "python3 scripts/build_speciality_doc.py",
     "selftest": "node scripts/selftest.js && python3 scripts/selftest_osm.py",
