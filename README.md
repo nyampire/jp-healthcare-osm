@@ -76,12 +76,36 @@ npm run all
 
 | タグ | 対象業態 | 生成数 |
 |---|---|---:|
-| `opening_hours` | 全業態 | 199,456 |
-| `healthcare:speciality` | 病院、診療所、歯科診療所 | 142,507 |
-| `name` / `official_name` / `short_name` | 全業態 | 206,043 |
+| `amenity` / `healthcare` | 全業態（助産所は `healthcare` のみ） | 199,347 |
+| `name` / `official_name` | 全業態 | 199,347 |
+| `short_name` | 略称のある業態 | 業態による |
 | `name:ja-Hira` | 全業態 | 158,358 |
 | `name:ja-Latn` | 全業態 | 79,122 |
 | `name:en` | 全業態 | 83,552 |
+| `opening_hours` | 全業態 | 199,456 |
+| `healthcare:speciality` | 病院、診療所、歯科診療所 | 142,507 |
+| `website` | 全業態 | 業態による |
+| `addr:full` | 全業態 | 199,347 |
+| `beds` | 病院、診療所 | 業態による |
+| `source` | 全業態 | 199,347 |
+
+`ref` 系のタグは付けていません。
+医療情報ネットの ID を OSM のどのキーで持つかは合意が要るため、`ID` 列を残すに留めています。
+
+## 処理の流れ
+
+業態ごとに5段階で処理します。
+
+```
+1. build_opening_hours.py  曜日フラグと時刻から opening_hours を組み立てる
+2. build_speciality.py     診療科目コードを healthcare:speciality へ対応付ける
+3. build_names.py          名称を正規化し name 系のタグを作る
+4. geocode_missing.js      座標が 0.0,0.0 の施設を住所から補完する
+5. build_osm.py            以上を ID で結合し、CSV と GeoJSON を出す
+```
+
+4 はネットワークを使います。
+住所ごとの結果を `output/.geocode_cache.json` に保存するので、2回目以降は短時間で終わります。
 
 ## 構成
 
@@ -90,18 +114,27 @@ scripts/
   build_opening_hours.py     曜日フラグと時刻から opening_hours を組み立てる
   build_speciality.py        診療科目コードを healthcare:speciality へ対応付ける
   build_names.py             名称を正規化し name 系のタグを作る
+  geocode_missing.js         座標が無い施設を住所から補完する
+  build_osm.py               各タグを結合し CSV と GeoJSON を出す
+  build_maproulette.py       MapRoulette のタスクファイルを出す
+  build_speciality_doc.py    対応表から docs/speciality-mapping.md を生成する
   validate_opening_hours.js  OSM の参照実装 opening_hours.js で全件検証する
   validate_speciality.py     語彙、書式、タグ値長を検証する
   validate_names.py          法人格の残留やかな変換漏れを検証する
-  selftest.js                検証器そのものの逆テスト
+  validate_osm.py            座標の範囲と順序、タグの形式を検証する
+  selftest.js                opening_hours 検証器の逆テスト
+  selftest_osm.py            OSM 出力検証器の逆テスト
 mapping/
-  speciality_mapping.csv     診療科目コード126種から OSM 値への対応表
+  speciality_mapping.csv     診療科目コード127種から OSM 値への対応表
   speciality_rollup.csv      タグ値255文字を超えたときの畳み先
+  facility_tags.csv          業態から amenity と healthcare への対応
   name_entity_prefixes.csv   法人格と運営主体の先頭パターン
   name_entity_suffixes.csv   法人名トークンの接尾辞
   name_facility_words.csv    施設種別語
 tests/
-  known_bad.csv              検証器の逆テスト用フィクスチャ
+  known_bad.csv              opening_hours 検証器の逆テスト用フィクスチャ
+  known_bad_osm.csv          OSM 出力検証器の逆テスト用フィクスチャ
+  known_bad_osm.geojson      同上
 ```
 
 判断を含む対応付けはスクリプトに埋め込まず、`mapping/` の CSV に外出ししています。
@@ -110,19 +143,53 @@ tests/
 
 ## 出力
 
-`output/` に業態ごとの CSV を生成します。
+`output/` に業態ごとのファイルを生成します。
 元データの列は書き換えず、変換後の値は別列として持ちます。
 除外や保留をした行は理由とともに全件が一覧に残るので、第三者が対比して検証できます。
 
+投入に使うのは次の2つです。
+
 | ファイル | 内容 |
 |---|---|
-| `<業態>_opening_hours.csv` | opening_hours と要確認フラグ、備考 |
+| `<業態>_osm.geojson` | 結合済みの点データ。JOSM で開ける |
+| `<業態>_osm.csv` | 同じ内容の一覧。表計算ソフトで確認する用 |
+
+MapRoulette を使う場合は `output/maproulette/` に別形式で出します。
+
+```bash
+npm run maproulette
+```
+
+都道府県ごとに分割した line-by-line GeoJSON を、233チャレンジ199,347タスク分出力します。
+`index.csv` にチャレンジの一覧と件数が入ります。
+
+途中の生成物と検証材料は次のとおりです。
+
+| ファイル | 内容 |
+|---|---|
+| `<業態>_geocoded.csv` | 座標と住所。元の値、付与した値、出典、精度レベル |
 | `<業態>_names.csv` | 元の名称列と name 系タグ |
+| `<業態>_opening_hours.csv` | opening_hours と要確認フラグ、備考 |
 | `<業態>_speciality.csv` | healthcare:speciality と丸めた診療科の内訳 |
 | `<業態>_excluded.csv` | opening_hours から除外した区間の全件 |
 | `<業態>_conflicts.csv` | 曜日フラグと時刻が矛盾する行と、採用した判断 |
 | `<業態>_emergency.csv` | 救急科の診療時間（外来とは別枠） |
 | `*_validation.csv` | 検証で検出した項目 |
+
+## 現在の到達点
+
+206,043施設のうち199,347件を出力しています。
+
+| 業態 | 施設数 | 出力 | 座標が元データ | 座標を付与 | 座標なしで除外 |
+|---|---:|---:|---:|---:|---:|
+| 病院 | 7,715 | 7,602 | 7,447 | 155 | 113 |
+| 診療所 | 80,155 | 78,083 | 75,190 | 2,893 | 2,072 |
+| 歯科診療所 | 54,637 | 53,266 | 51,384 | 1,882 | 1,371 |
+| 助産所 | 2,138 | 1,841 | 1,684 | 157 | 297 |
+| 薬局 | 61,398 | 58,555 | 54,095 | 4,460 | 2,843 |
+| 合計 | 206,043 | 199,347 | 189,800 | 9,547 | 6,696 |
+
+検証は全業態で欠陥ゼロ、検証器の逆テストは11件すべて通ります。
 
 ## OSM へのインポートについて
 
@@ -131,8 +198,29 @@ tests/
 [Import Guidelines](https://wiki.openstreetmap.org/wiki/JA:Import/Guidelines) に沿って
 imports メーリングリストでの合意形成が必要です。
 
-未解決の課題は次の3点です。
+wiki に掲載するインポート計画の下書きを
+[docs/import-plan.md](docs/import-plan.md) に用意しています。
+Import Guidelines が求める項目に沿って書いており、記入が必要な箇所には印を付けています。
 
-座標が `0.0, 0.0` の欠損レコードがあります（病院票で268件、北海道31%、沖縄48%と地域偏在）。
-測地系が定義書に記載されておらず未確定です。
-`healthcare:speciality` に対応値が無い診療科があります（乳腺外科973施設、心療内科1,097施設ほか）。
+合意で決めるべき項目が3つあります。
+
+`ref` 系のタグをどのキーで持つか決まっていません。
+医療情報ネットの ID を保持できると更新への追随や重複の判定に使えますが、
+キーの命名は勝手に決められません。
+
+診療所の `amenity` が暫定です。
+病床数が空欄の31,399件を無床とみなして `doctors` に寄せており、73,809件が推定に該当します。
+一律 `clinic` にする案もあります。
+
+`healthcare:speciality` に対応値が無い診療科があります。
+心療内科5,565施設は `psychiatry` に、乳腺外科1,750施設は `surgery` に丸めています。
+論点は [docs/speciality-mapping.md](docs/speciality-mapping.md) の末尾にまとめています。
+
+データ側で残っている課題が2つあります。
+
+座標が `0.0, 0.0` の16,243件のうち、6,696件は補完できていません。
+ジオコーダの位置レベルが3以下で、建物から数百メートルずれるため採用していません。
+
+ジオコーディングで位置レベル8に届かない原因が未解明です。
+参照データの有無では説明できない事例があり、
+[docs/geocoding-investigation.md](docs/geocoding-investigation.md) に引き継ぎ用の記録を残しています。
