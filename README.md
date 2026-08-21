@@ -54,6 +54,10 @@ PDL1.0 は「編集・加工した情報を、あたかも国又は府省等が�
 
 変換処理の設計と、各判断の根拠となる実測値は [docs/processing.md](docs/processing.md) にあります。
 
+座標が `0.0, 0.0` の16,243件をジオコーディングで補完できるかの調査は
+[docs/geocoding-investigation.md](docs/geocoding-investigation.md) にあります。
+結論は出ておらず、未解決の問いと再現手順を残した引き継ぎ用の記録です。
+
 診療科目コードと `healthcare:speciality` の対応は
 [docs/speciality-mapping.md](docs/speciality-mapping.md) に一覧があります。
 127コードすべてと、どの診療科がどの値に集まるかの逆引きを載せています。
