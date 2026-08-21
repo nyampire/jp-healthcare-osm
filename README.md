@@ -198,6 +198,10 @@ npm run maproulette
 [Import Guidelines](https://wiki.openstreetmap.org/wiki/JA:Import/Guidelines) に沿って
 imports メーリングリストでの合意形成が必要です。
 
+wiki に掲載するデータソース解説ページの下書きを
+[docs/wiki-iryo-joho-ja.md](docs/wiki-iryo-joho-ja.md) に用意しています。
+元データの内容と利用上の注意を、これから使う人向けにまとめたものです。
+
 wiki に掲載するインポート計画の下書きを
 [docs/import-plan.md](docs/import-plan.md) に用意しています。
 Import Guidelines が求める項目に沿って書いており、記入が必要な箇所には印を付けています。
