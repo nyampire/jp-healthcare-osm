@@ -1,0 +1,7 @@
+業態,条件,amenity,healthcare,確度,備考
+hospital,,hospital,hospital,exact,医療法の病院は20床以上。OSMのhospitalに対応する
+clinic,病床1以上,clinic,clinic,exact,有床診療所。入院設備がありOSMのclinicに対応する
+clinic,病床0または空欄,doctors,doctor,broader,無床診療所とみなす。病床数が空欄の31399件を含むため要確認
+dental,,dentist,dentist,exact,
+maternity,,,midwife,exact,healthcare=midwifeに対応するamenityは存在しない
+pharmacy,,pharmacy,pharmacy,exact,

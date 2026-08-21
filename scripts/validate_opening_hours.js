@@ -116,6 +116,7 @@ function main() {
   const warnings = [];
   const neverOpen = [];
   const zeroSpan = [];
+  const tooLong = [];
 
   for (const r of rows) {
     if (!r.length || !r[col.ID]) continue;
@@ -166,7 +167,11 @@ function main() {
         });
       }
     }
-    const zero = value.match(RE_ZERO_SPAN);
+      // OSM のタグ値は 255 文字が上限。構文が正しくても投入できない。
+    if (value.length > 255) {
+      tooLong.push({ id, name, value, detail: `${value.length}文字（上限255）` });
+    }
+  const zero = value.match(RE_ZERO_SPAN);
     if (zero) {
       zeroSpan.push({
         id, name, value,
@@ -184,6 +189,7 @@ function main() {
   push("error", errors);
   push("never_open", neverOpen);
   push("zero_span", zeroSpan);
+  push("too_long", tooLong);
   push("warning", warnings);
   const csv = report
     .map((r) =>
@@ -200,6 +206,7 @@ function main() {
   console.log(`  警告             : ${warnings.length.toLocaleString()}`);
   console.log(`  5週間で一度も開かない: ${neverOpen.length.toLocaleString()}`);
   console.log(`  ゼロ長区間       : ${zeroSpan.length.toLocaleString()}`);
+  console.log(`  255文字超        : ${tooLong.length.toLocaleString()}`);
 
   for (const e of errors.slice(0, 5)) {
     console.log(`\n  ERROR ${e.name}\n    ${e.value}\n    ${e.detail}`);
@@ -225,7 +232,7 @@ function main() {
   }
 
   // ゼロ長区間と「一度も開かない」は生成側の欠陥なのでエラー扱いにする
-  const fatal = errors.length + neverOpen.length + zeroSpan.length;
+  const fatal = errors.length + neverOpen.length + zeroSpan.length + tooLong.length;
   process.exit(fatal ? 1 : 0);
 }
 

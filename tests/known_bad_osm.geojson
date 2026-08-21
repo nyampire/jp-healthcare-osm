@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [139.77, 35.68]}, "properties": {"_id": "T01", "name": "正常な病院"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [35.68, 139.77]}, "properties": {"_id": "T02", "name": ""}}]}
