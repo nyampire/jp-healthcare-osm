@@ -206,7 +206,8 @@ function main() {
   console.log(`  警告             : ${warnings.length.toLocaleString()}`);
   console.log(`  5週間で一度も開かない: ${neverOpen.length.toLocaleString()}`);
   console.log(`  ゼロ長区間       : ${zeroSpan.length.toLocaleString()}`);
-  console.log(`  255文字超        : ${tooLong.length.toLocaleString()}`);
+  console.log(`  255文字超        : ${tooLong.length.toLocaleString()}`
+    + "（build_osm.py が短縮するため不合格にしない）");
 
   for (const e of errors.slice(0, 5)) {
     console.log(`\n  ERROR ${e.name}\n    ${e.value}\n    ${e.detail}`);
@@ -231,8 +232,15 @@ function main() {
     console.log(`\n  ZERO SPAN ${x.name}\n    ${x.value}`);
   }
 
-  // ゼロ長区間と「一度も開かない」は生成側の欠陥なのでエラー扱いにする
-  const fatal = errors.length + neverOpen.length + zeroSpan.length + tooLong.length;
+  // ゼロ長区間と「一度も開かない」は生成側の欠陥なのでエラー扱いにする。
+  //
+  // 255文字超は含めない。255文字は OSM のタグ値の上限であって、このファイルが
+  // 検証する中間ファイルの制約ではない。中間ファイルは元データの休診日を
+  // そのまま保持するのが正しく、休診日を個別に並べた施設が長くなるのは欠陥ではない。
+  // 収める処理は build_osm.py の fit_opening_hours が行い、最終成果物に対する
+  // 255文字の検査は validate_osm.py の tag_too_long が担う。
+  // ここで落とすと、下流で解決済みの事象でパイプライン全体が止まる。
+  const fatal = errors.length + neverOpen.length + zeroSpan.length;
   process.exit(fatal ? 1 : 0);
 }
 
