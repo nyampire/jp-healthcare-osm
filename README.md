@@ -1,4 +1,4 @@
-# osm-iryo-joho
+# jp-healthcare-osm
 
 厚生労働省「医療情報ネット」のオープンデータを、OpenStreetMap で使えるタグへ変換する作業リポジトリです。
 

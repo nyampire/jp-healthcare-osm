@@ -1,5 +1,5 @@
 {
-  "name": "osm-iryo-joho",
+  "name": "jp-healthcare-osm",
   "version": "0.1.0",
   "private": true,
   "description": "医療情報ネット オープンデータを OSM 向けに変換する作業リポジトリ",
