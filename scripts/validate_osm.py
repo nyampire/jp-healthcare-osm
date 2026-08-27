@@ -172,7 +172,8 @@ def main():
     # defaultdict を参照すると空の項目が増えてしまうため get で読む
     for k in ("geojson_structure", "count_mismatch", "id_mismatch", "coord_order",
               "coord_range", "name_missing", "type_missing", "unknown_value",
-              "bad_website", "bad_key", "tag_too_long", "control_char", "untrimmed"):
+              "bad_website", "bad_key", "tag_too_long", "control_char", "untrimmed",
+              "addr_hierarchy", "addr_note_chiban", "addr_province_mismatch"):
         items = issues.get(k, [])
         print(f"  {k:<18}: {len(items):,}")
         for ident, detail in items[:2]:
