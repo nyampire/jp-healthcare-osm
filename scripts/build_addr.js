@@ -119,6 +119,18 @@ async function main() {
   const ix = {};
   header.forEach((h, n) => (ix[h] = n));
 
+  // 列が欠けたまま進むと r[undefined].trim() の TypeError になり、
+  // どの列が無いのか分からない。読み終えた直後に検査して落とす。
+  // 都道府県コードは .trim() を通らないので落ちないが、欠けると
+  // 出力の列が黙って空になり build_osm.py まで伝わるので併せて見る。
+  for (const need of ["所在地", "所在地座標（緯度）", "所在地座標（経度）",
+                      "都道府県コード", conf.name]) {
+    if (ix[need] === undefined) {
+      console.error(`必要な列が見つかりません: ${need}`);
+      process.exit(2);
+    }
+  }
+
   let src_rows = rows.filter((r) => r.length && r[0]);
   if (limit > 0) src_rows = src_rows.slice(0, limit);
 
