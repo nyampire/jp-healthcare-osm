@@ -18,7 +18,9 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXPECTED = {("T02", "coord_order"), ("T02", "name_missing")}
+EXPECTED = {("T02", "coord_order"), ("T02", "name_missing"),
+            ("T03", "addr_hierarchy"), ("T04", "addr_note_chiban"),
+            ("T05", "addr_province_mismatch")}
 
 
 def main():

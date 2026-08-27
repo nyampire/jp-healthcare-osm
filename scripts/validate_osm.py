@@ -116,6 +116,26 @@ def main():
         if h:
             value_use[f"healthcare={h}"] += 1
 
+        # 番地だけあって町字が無い行。OSM では階層を飛ばした addr は使えない
+        if r.get("addr:housenumber") and not r.get("addr:neighbourhood"):
+            add("addr_hierarchy", fid, "addr:housenumber があるのに addr:neighbourhood が空")
+
+        # 住居表示未実施の町字では、NJA が解決できなかった地番が note に残る。
+        # 値の出自は利用者の入力文字列だが、実質は地番なので投入前に確認する。
+        note = r.get("note", "")
+        if note and note[0].isdigit():
+            add("addr_note_chiban", fid, f"note が数字で始まる: {note}")
+
+        # addr:province は元データの所在地の先頭と一致するはず。
+        # 食い違うのは町字の照合が別の都道府県へ流れた兆候になる。
+        # 都道府県コードとの突き合わせにすると47件の対応表が要るので、
+        # 同じ行にある addr:full の先頭を使う。
+        prov = r.get("addr:province", "")
+        full = r.get("addr:full", "")
+        if prov and full and not full.startswith(prov):
+            add("addr_province_mismatch", fid,
+                f"addr:province が {prov} だが所在地は {full[:12]} で始まる")
+
         w = r.get("website", "")
         if w and not RE_URL.match(w):
             add("bad_website", fid, f"URL の形式が不正: {w[:60]}")

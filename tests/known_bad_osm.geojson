@@ -1,1 +1,109 @@
-{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [139.77, 35.68]}, "properties": {"_id": "T01", "name": "正常な病院"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [35.68, 139.77]}, "properties": {"_id": "T02", "name": ""}}]}
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.77,
+     35.68
+    ]
+   },
+   "properties": {
+    "_id": "T01",
+    "name": "正常な病院"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     35.68,
+     139.77
+    ]
+   },
+   "properties": {
+    "_id": "T02",
+    "name": ""
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.77,
+     35.68
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "階層が飛んだ病院",
+    "official_name": "階層が飛んだ病院",
+    "addr:full": "東京都千代田区1-3",
+    "addr:country": "JP",
+    "addr:province": "東京都",
+    "addr:block_number": "1",
+    "addr:housenumber": "3",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T03",
+    "_座標の出典": "原データ"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.77,
+     35.68
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "地番が note に残った病院",
+    "official_name": "地番が note に残った病院",
+    "addr:full": "福島県白河市六反山10-36",
+    "addr:country": "JP",
+    "addr:province": "福島県",
+    "addr:city": "白河市",
+    "addr:neighbourhood": "六反山",
+    "note": "10-36",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T04",
+    "_座標の出典": "原データ"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.77,
+     35.68
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "都道府県が食い違う病院",
+    "official_name": "都道府県が食い違う病院",
+    "addr:full": "東京都千代田区1-5",
+    "addr:country": "JP",
+    "addr:province": "神奈川県",
+    "addr:city": "千代田区",
+    "addr:neighbourhood": "紀尾井町",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T05",
+    "_座標の出典": "原データ"
+   }
+  }
+ ]
+}
