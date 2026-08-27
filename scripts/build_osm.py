@@ -236,6 +236,17 @@ def main():
             "healthcare:speciality": sp.get("healthcare:speciality", ""),
             "website": website,
             "addr:full": g["元_所在地"],
+            "addr:country": g.get("addr:country", ""),
+            "addr:province": g.get("addr:province", ""),
+            "addr:county": g.get("addr:county", ""),
+            "addr:city": g.get("addr:city", ""),
+            "addr:suburb": g.get("addr:suburb", ""),
+            "addr:quarter": g.get("addr:quarter", ""),
+            "addr:neighbourhood": g.get("addr:neighbourhood", ""),
+            "addr:block_number": g.get("addr:block_number", ""),
+            "addr:housenumber": g.get("addr:housenumber", ""),
+            "note": g.get("未解釈の文字列", ""),
+            "fixme": g.get("fixme", ""),
             "beds": beds_tag,
             "source": SOURCE,
         }
@@ -255,7 +266,11 @@ def main():
 
     keys = ["amenity", "healthcare", "name", "official_name", "short_name",
             "name:ja-Hira", "name:ja-Latn", "name:en", "opening_hours",
-            "healthcare:speciality", "website", "addr:full", "beds", "source"]
+            "healthcare:speciality", "website", "addr:full",
+            "addr:country", "addr:province", "addr:county", "addr:city",
+            "addr:suburb", "addr:quarter", "addr:neighbourhood",
+            "addr:block_number", "addr:housenumber", "note", "fixme",
+            "beds", "source"]
     os.makedirs(args.out_dir, exist_ok=True)
     csv_path = os.path.join(args.out_dir, f"{args.sector}_osm.csv")
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
