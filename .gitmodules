@@ -1,0 +1,3 @@
+[submodule "vendor/nja-osm-tags"]
+	path = vendor/nja-osm-tags
+	url = https://github.com/nyampire/nja-osm-tags.git
