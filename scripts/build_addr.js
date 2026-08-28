@@ -38,6 +38,8 @@ const SECTORS = {
 };
 
 const DEFAULT_ADOPT_LEVEL = 8;
+const API_BASE_ENV = "NJA_API_BASE";
+const PUBLIC_API_HOST = "japanese-addresses-v2.geoloniamaps.com";
 const BATCH = path.join(__dirname, "..", "vendor", "nja-osm-tags", "bin", "batch.ts");
 
 function parseCsv(text) {
@@ -79,6 +81,34 @@ function findSource(dir, pattern) {
   return path.join(dir, hits[hits.length - 1]);
 }
 
+/**
+ * 住所データの取得先を確かめる。
+ *
+ * nja-osm-tags は NJA_API_BASE が未設定なら公開 API を読む。
+ * 20万件を通すと1件ごとに問い合わせが出るうえ、公開 API が配信している
+ * データは手元に構築したものより古い。どちらも黙って起きてほしくないので、
+ * 取得先が手元を指していることを確かめてから動く。
+ *
+ * 値が file:// や存在しないパスかどうかは nja-osm-tags の applyApiBase が
+ * 起動時に確かめる。ここでは二重に検査しない。
+ */
+function requireLocalApiBase() {
+  const raw = (process.env[API_BASE_ENV] || "").trim();
+  if (!raw) {
+    console.error(`住所データの取得先が設定されていません: ${API_BASE_ENV}`);
+    console.error("japanese-addresses-v2 を手元に構築し、その out/api/ja を指してください");
+    console.error(`  export ${API_BASE_ENV}=/path/to/japanese-addresses-v2/out/api/ja`);
+    console.error("構築の手順は vendor/nja-osm-tags/docs/local-mirror.md にあります");
+    process.exit(2);
+  }
+  if (raw.includes(PUBLIC_API_HOST)) {
+    console.error(`公開 API は使いません: ${raw}`);
+    console.error("配信されているデータが手元に構築したものより古く、");
+    console.error("20万件の問い合わせは相手にも負荷をかけます");
+    process.exit(2);
+  }
+}
+
 /** nja-osm-tags のバッチを呼び、出力を行の配列で返す */
 function runBatch(inputPath) {
   const stdout = execFileSync("node", [BATCH, "--address-column", "所在地", inputPath], {
@@ -111,6 +141,8 @@ async function main() {
   const outDir = arg("--out-dir", "output");
   const limit = parseInt(arg("--limit", "0"), 10);
   const adoptLevel = parseInt(arg("--adopt-level", String(DEFAULT_ADOPT_LEVEL)), 10);
+
+  requireLocalApiBase();
 
   const conf = SECTORS[sector];
   const src = findSource(dataDir, conf.pattern);

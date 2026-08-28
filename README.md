@@ -74,8 +74,11 @@ npm run all
 `nja-osm-tags` は型ストリッピングで TypeScript を直接実行するため、Node.js v26 以上が必要です。
 
 住所データの取得先は環境変数 `NJA_API_BASE` で指定します。
-未設定なら Geolonia の公開 API を読みますが、20万件を通すと1件ごとにリクエストが出ます。
-手元に `japanese-addresses-v2` を構築して指すほうが速く、公開 API への負荷もかかりません。
+設定は必須で、未設定なら `build_addr.js` が終了コード2で落ちます。
+公開 API を指した場合も落とします。
+公開 API が配信しているデータは手元に構築したものより古く、
+20万件の問い合わせは相手にも負荷をかけるためです。
+`japanese-addresses-v2` を手元に構築して指してください。
 構築の手順は `vendor/nja-osm-tags/docs/local-mirror.md` にあります。
 
 ```bash
@@ -130,8 +133,7 @@ export NJA_API_BASE=/path/to/japanese-addresses-v2/out/api/ja
 ```
 
 4 は住所データを参照します。
-既定では Geolonia の公開 API を読みますが、20万件を通すなら手元にデータを構築して
-環境変数 `NJA_API_BASE` で指すほうが現実的です。
+取得先は環境変数 `NJA_API_BASE` で指定し、手元に構築したデータを指していなければ落ちます。
 全国のデータを手元に置いた環境では、全業態の生成と逆テストと検証が通しで14分でした。
 
 ## 構成
