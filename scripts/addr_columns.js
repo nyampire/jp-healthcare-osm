@@ -16,6 +16,29 @@ const POINT_LEVEL_NOTE = {
   8: "住居表示の位置",
 };
 
+/**
+ * 元データの座標を住所側で置き換える距離の下限。
+ *
+ * 診療所32,626件の実測で、両者の距離は中央値15m、99パーセンタイル413mだった。
+ * 1kmを超えるのは119件（0.36%）で、その全てが番地を明細と照合できた行だった。
+ * 大きい方は熊本の診療所が約900km離れており、元データの座標の誤りと判断できる。
+ * 敷地の広い病院でも1kmは超えないので、正しい座標を動かす危険が小さい。
+ */
+const MAX_DRIFT_METERS = 1000;
+
+/** 2点間の距離をメートルで返す */
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const p1 = toRad(lat1);
+  const p2 = toRad(lat2);
+  const dp = toRad(lat2 - lat1);
+  const dl = toRad(lon2 - lon1);
+  const h = Math.sin(dp / 2) ** 2
+    + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 /** addr:* のキー。OSM の階層順に並べる */
 const ADDR_KEYS = [
   "addr:country", "addr:province", "addr:county", "addr:city",
@@ -41,7 +64,7 @@ function usable(v) {
  * 片方でも欠ければ NJA の点に回す。片方だけ採ると、欠けたほうが 0 のまま
  * 残って赤道上の座標になる。
  */
-function foldColumns(nja, rawLat, rawLon, adoptLevel) {
+function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METERS) {
   const out = {
     lat: "", lon: "",
     "座標の出典": "", "位置レベル": "", "位置レベルの意味": "",
@@ -54,7 +77,38 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel) {
   };
   const notes = [];
 
+  const level = nja["_座標精度"] === "" || nja["_座標精度"] === undefined
+    ? null : parseInt(nja["_座標精度"], 10);
+
   if (usable(rawLat) && usable(rawLon)) {
+    // 元データの座標が住所から大きく離れている場合だけ、住所側を採る。
+    // 同じ座標を別の市区町村の施設が共有している例が実在し、元データの座標が
+    // 誤っていることがある。
+    //
+    // 条件を絞る理由は2つある。位置レベルが8未満だと比較相手が町字の代表点に
+    // なり、正しい座標まで離れて見える。番地が推定だと、入力文字列を機械的に
+    // 切った番地に引きずられて別の場所を指しうる。
+    // 実測では1kmを超えた119件が全て照合済みだったので、絞っても取りこぼさない。
+    const drift = level !== null && level >= adoptLevel
+      && nja["_番地の根拠"] === "照合済み"
+      && usable(nja["_lat"]) && usable(nja["_lng"])
+      ? distanceMeters(parseFloat(rawLat), parseFloat(rawLon),
+        parseFloat(nja["_lat"]), parseFloat(nja["_lng"]))
+      : null;
+
+    if (drift !== null && drift > maxDrift) {
+      out.lat = nja["_lat"];
+      out.lon = nja["_lng"];
+      out["座標の出典"] = "ジオコーディング";
+      out["位置レベル"] = String(level);
+      out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
+      out["要確認"] = "yes";
+      notes.push(`元データの座標が住所から${Math.round(drift).toLocaleString()}m離れているため住所側を採用`);
+      if (out["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${out["未解釈の文字列"]}`);
+      out["備考"] = notes.join(" / ");
+      return out;
+    }
+
     out.lat = String(rawLat).trim();
     out.lon = String(rawLon).trim();
     out["座標の出典"] = "原データ";
@@ -63,8 +117,6 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel) {
     return out;
   }
 
-  const level = nja["_座標精度"] === "" || nja["_座標精度"] === undefined
-    ? null : parseInt(nja["_座標精度"], 10);
   if (level !== null) {
     out["位置レベル"] = String(level);
     out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
@@ -98,4 +150,4 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel) {
   return out;
 }
 
-module.exports = { foldColumns, ADDR_KEYS, POINT_LEVEL_NOTE };
+module.exports = { foldColumns, ADDR_KEYS, POINT_LEVEL_NOTE, MAX_DRIFT_METERS };
