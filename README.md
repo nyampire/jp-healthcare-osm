@@ -65,8 +65,21 @@ PDL1.0 は「編集・加工した情報を、あたかも国又は府省等が�
 ## 使い方
 
 ```bash
+git submodule update --init
 npm install
 npm run all
+```
+
+住所の構造化は `vendor/nja-osm-tags` が行うので、submodule の取得が要ります。
+`nja-osm-tags` は型ストリッピングで TypeScript を直接実行するため、Node.js v26 以上が必要です。
+
+住所データの取得先は環境変数 `NJA_API_BASE` で指定します。
+未設定なら Geolonia の公開 API を読みますが、20万件を通すと1件ごとにリクエストが出ます。
+手元に `japanese-addresses-v2` を構築して指すほうが速く、公開 API への負荷もかかりません。
+構築の手順は `vendor/nja-osm-tags/docs/local-mirror.md` にあります。
+
+```bash
+export NJA_API_BASE=/path/to/japanese-addresses-v2/out/api/ja
 ```
 
 `npm run all` は生成、逆テスト、検証を通しで実行します。
@@ -76,18 +89,30 @@ npm run all
 
 | タグ | 対象業態 | 生成数 |
 |---|---|---:|
-| `amenity` / `healthcare` | 全業態（助産所は `healthcare` のみ） | 199,347 |
-| `name` / `official_name` | 全業態 | 199,347 |
-| `short_name` | 略称のある業態 | 業態による |
-| `name:ja-Hira` | 全業態 | 158,358 |
-| `name:ja-Latn` | 全業態 | 79,122 |
-| `name:en` | 全業態 | 83,552 |
-| `opening_hours` | 全業態 | 199,456 |
-| `healthcare:speciality` | 病院、診療所、歯科診療所 | 142,507 |
-| `website` | 全業態 | 業態による |
-| `addr:full` | 全業態 | 199,347 |
-| `beds` | 病院、診療所 | 業態による |
-| `source` | 全業態 | 199,347 |
+| `amenity` | 助産所以外 | 194,712 |
+| `healthcare` | 全業態 | 196,500 |
+| `name` / `official_name` | 全業態 | 196,500 |
+| `short_name` | 略称のある業態 | 95,231 |
+| `name:ja-Hira` | 全業態 | 150,634 |
+| `name:ja-Latn` | 全業態 | 76,140 |
+| `name:en` | 全業態 | 81,579 |
+| `opening_hours` | 全業態 | 190,657 |
+| `healthcare:speciality` | 病院、診療所、歯科診療所 | 137,307 |
+| `website` | 全業態 | 122,009 |
+| `addr:full` | 全業態 | 196,500 |
+| `addr:country` | 全業態 | 196,500 |
+| `addr:province` | 全業態 | 196,500 |
+| `addr:county` | 郡がある住所 | 11,648 |
+| `addr:city` | 全業態 | 196,488 |
+| `addr:suburb` | 政令指定都市の区など | 47,500 |
+| `addr:quarter` | 町字の下に区分がある住所 | 8,609 |
+| `addr:neighbourhood` | 全業態 | 192,874 |
+| `addr:block_number` | 住居表示を実施した区域 | 113,657 |
+| `addr:housenumber` | 住居表示を実施した区域 | 112,475 |
+| `note` | 住所に未解釈の部分が残った施設 | 66,005 |
+| `fixme` | 番地の要素が3つ以上ある施設 | 3,364 |
+| `beds` | 病院、診療所 | 11,680 |
+| `source` | 全業態 | 196,500 |
 
 `ref` 系のタグは付けていません。
 医療情報ネットの ID を OSM のどのキーで持つかは合意が要るため、`ID` 列を残すに留めています。
@@ -100,12 +125,14 @@ npm run all
 1. build_opening_hours.py  曜日フラグと時刻から opening_hours を組み立てる
 2. build_speciality.py     診療科目コードを healthcare:speciality へ対応付ける
 3. build_names.py          名称を正規化し name 系のタグを作る
-4. geocode_missing.js      座標が 0.0,0.0 の施設を住所から補完する
+4. build_addr.js           住所を addr:* に構造化し、座標が無い施設を補完する
 5. build_osm.py            以上を ID で結合し、CSV と GeoJSON を出す
 ```
 
-4 はネットワークを使います。
-住所ごとの結果を `output/.geocode_cache.json` に保存するので、2回目以降は短時間で終わります。
+4 は住所データを参照します。
+既定では Geolonia の公開 API を読みますが、20万件を通すなら手元にデータを構築して
+環境変数 `NJA_API_BASE` で指すほうが現実的です。
+全国のデータを手元に置いた環境では、全業態の生成と逆テストと検証が通しで14分でした。
 
 ## 構成
 
@@ -114,7 +141,8 @@ scripts/
   build_opening_hours.py     曜日フラグと時刻から opening_hours を組み立てる
   build_speciality.py        診療科目コードを healthcare:speciality へ対応付ける
   build_names.py             名称を正規化し name 系のタグを作る
-  geocode_missing.js         座標が無い施設を住所から補完する
+  build_addr.js              住所を addr:* に構造化し、座標が無い施設を補完する
+  addr_columns.js            住所と座標を出力列に畳む純関数
   build_osm.py               各タグを結合し CSV と GeoJSON を出す
   build_maproulette.py       MapRoulette のタスクファイルを出す
   build_speciality_doc.py    対応表から docs/speciality-mapping.md を生成する
@@ -123,6 +151,7 @@ scripts/
   validate_names.py          法人格の残留やかな変換漏れを検証する
   validate_osm.py            座標の範囲と順序、タグの形式を検証する
   selftest.js                opening_hours 検証器の逆テスト
+  selftest_addr.js           住所の列を畳む純関数の逆テスト
   selftest_osm.py            OSM 出力検証器の逆テスト
 mapping/
   speciality_mapping.csv     診療科目コード127種から OSM 値への対応表
@@ -135,6 +164,9 @@ tests/
   known_bad.csv              opening_hours 検証器の逆テスト用フィクスチャ
   known_bad_osm.csv          OSM 出力検証器の逆テスト用フィクスチャ
   known_bad_osm.geojson      同上
+  known_bad_addr.csv         住所の列を畳む純関数の逆テスト用フィクスチャ
+vendor/
+  nja-osm-tags/              住所を addr:* に変換する submodule
 ```
 
 判断を含む対応付けはスクリプトに埋め込まず、`mapping/` の CSV に外出ししています。
@@ -160,7 +192,7 @@ MapRoulette を使う場合は `output/maproulette/` に別形式で出します
 npm run maproulette
 ```
 
-都道府県ごとに分割した line-by-line GeoJSON を、233チャレンジ199,347タスク分出力します。
+都道府県ごとに分割した line-by-line GeoJSON を、233チャレンジ196,500タスク分出力します。
 `index.csv` にチャレンジの一覧と件数が入ります。
 
 途中の生成物と検証材料は次のとおりです。
@@ -178,18 +210,22 @@ npm run maproulette
 
 ## 現在の到達点
 
-206,043施設のうち199,347件を出力しています。
+206,043施設のうち196,500件を出力しています。
 
 | 業態 | 施設数 | 出力 | 座標が元データ | 座標を付与 | 座標なしで除外 |
 |---|---:|---:|---:|---:|---:|
-| 病院 | 7,715 | 7,602 | 7,447 | 155 | 113 |
-| 診療所 | 80,155 | 78,083 | 75,190 | 2,893 | 2,072 |
-| 歯科診療所 | 54,637 | 53,266 | 51,384 | 1,882 | 1,371 |
-| 助産所 | 2,138 | 1,841 | 1,684 | 157 | 297 |
-| 薬局 | 61,398 | 58,555 | 54,095 | 4,460 | 2,843 |
-| 合計 | 206,043 | 199,347 | 189,800 | 9,547 | 6,696 |
+| 病院 | 7,715 | 7,527 | 7,447 | 80 | 188 |
+| 診療所 | 80,155 | 77,142 | 75,190 | 1,952 | 3,013 |
+| 歯科診療所 | 54,637 | 52,638 | 51,384 | 1,254 | 1,999 |
+| 助産所 | 2,138 | 1,788 | 1,684 | 104 | 350 |
+| 薬局 | 61,398 | 57,405 | 54,095 | 3,310 | 3,993 |
+| 合計 | 206,043 | 196,500 | 189,800 | 6,700 | 9,543 |
 
-検証は全業態で欠陥ゼロ、検証器の逆テストは11件すべて通ります。
+除外した9,543件の内訳は、地番方式の住所が5,143件、位置レベルが足りないものが4,400件です。
+
+致命的な検証項目は全業態で0件です。
+`addr_note_chiban` は18,425件を検出していますが、これは欠陥ではなく人手での確認を促す申し送りです。
+逆テストは opening_hours が10件、住所の列が6件、OSM 出力が8件で、すべて通ります。
 
 ## OSM へのインポートについて
 
@@ -220,10 +256,17 @@ Import Guidelines が求める項目に沿って書いており、記入が必�
 心療内科5,565施設は `psychiatry` に、乳腺外科1,750施設は `surgery` に丸めています。
 論点は [docs/speciality-mapping.md](docs/speciality-mapping.md) の末尾にまとめています。
 
-データ側で残っている課題が2つあります。
+データ側で残っている課題が3つあります。
 
-座標が `0.0, 0.0` の16,243件のうち、6,696件は補完できていません。
-ジオコーダの位置レベルが3以下で、建物から数百メートルずれるため採用していません。
+座標が `0.0, 0.0` の16,243件のうち、9,543件は補完していません。
+5,143件は地番方式の住所です。
+地番のデータを参照して得た座標はライセンス上出力できないため、補完の対象から外しています。
+残る4,400件は位置レベルが3以下で、建物から数百メートルずれるため採用していません。
+
+`note` に住所の未解釈部分が66,005件残っています。
+うち18,425件は数字で始まり、住居表示を実施していない町字で地番が残ったものが多くを占めます。
+残りは建物名や階や部屋番号で、`addr:housename` や `addr:floor` に移せる可能性があります。
+投入前に分割の方針を決める必要があります。
 
 ジオコーディングで位置レベル8に届かない原因が未解明です。
 参照データの有無では説明できない事例があり、
