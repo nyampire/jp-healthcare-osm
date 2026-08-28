@@ -6,8 +6,8 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     139.77,
-     35.68
+     139.771,
+     35.681
     ]
    },
    "properties": {
@@ -20,8 +20,8 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     35.68,
-     139.77
+     35.682,
+     139.772
     ]
    },
    "properties": {
@@ -34,8 +34,8 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     139.77,
-     35.68
+     139.773,
+     35.683
     ]
    },
    "properties": {
@@ -59,8 +59,8 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     139.77,
-     35.68
+     139.774,
+     35.684
     ]
    },
    "properties": {
@@ -85,8 +85,8 @@
    "geometry": {
     "type": "Point",
     "coordinates": [
-     139.77,
-     35.68
+     139.775,
+     35.685
     ]
    },
    "properties": {
@@ -102,6 +102,106 @@
     "beds": "100",
     "source": "出典",
     "_id": "T05",
+    "_座標の出典": "原データ"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     131.423893,
+     31.911095
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "座標が重なる病院A",
+    "official_name": "座標が重なる病院A",
+    "addr:full": "宮崎県都城市中央1-1",
+    "addr:country": "JP",
+    "addr:province": "宮崎県",
+    "addr:city": "都城市",
+    "addr:neighbourhood": "中央",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T06",
+    "_座標の出典": "原データ"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     131.423893,
+     31.911095
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "座標が重なる病院B",
+    "official_name": "座標が重なる病院B",
+    "addr:full": "宮崎県高鍋町中央2-2",
+    "addr:country": "JP",
+    "addr:province": "宮崎県",
+    "addr:city": "高鍋町",
+    "addr:neighbourhood": "中央",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T07",
+    "_座標の出典": "原データ"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.70888,
+     35.646368
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "同じ建物の病院3F",
+    "official_name": "同じ建物の病院3F",
+    "addr:full": "東京都渋谷区中央3-3",
+    "addr:country": "JP",
+    "addr:province": "東京都",
+    "addr:city": "渋谷区",
+    "addr:neighbourhood": "中央",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T08",
+    "_座標の出典": "原データ"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.70888,
+     35.646368
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "同じ建物の病院4F",
+    "official_name": "同じ建物の病院4F",
+    "addr:full": "東京都渋谷区中央4-4",
+    "addr:country": "JP",
+    "addr:province": "東京都",
+    "addr:city": "渋谷区",
+    "addr:neighbourhood": "中央",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T09",
     "_座標の出典": "原データ"
    }
   }

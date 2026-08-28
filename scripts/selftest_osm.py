@@ -21,7 +21,8 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXPECTED = {("T02", "coord_order"), ("T02", "name_missing"),
             ("T03", "addr_hierarchy"), ("T04", "addr_note_chiban"),
-            ("T05", "addr_province_mismatch")}
+            ("T05", "addr_province_mismatch"),
+            ("T06", "coord_cross_city"), ("T07", "coord_cross_city")}
 
 
 def main():
@@ -48,11 +49,14 @@ def main():
             if not ok:
                 failed += 1
             print(f"  {'PASS' if ok else 'FAIL'}  {ident} を {kind} として検出")
-        extra = {x for x in got if x[0] == "T01"}
+        extra = got - EXPECTED
         ok = not extra
         if not ok:
             failed += 1
-        print(f"  {'PASS' if ok else 'FAIL'}  T01（正常な地物）を検出しない")
+        print(f"  {'PASS' if ok else 'FAIL'}  期待しない検出が無い")
+        if not ok:
+            for x in sorted(extra):
+                print(f"        余分な検出: {x[0]} {x[1]}")
         ok = r.returncode == 1
         if not ok:
             failed += 1

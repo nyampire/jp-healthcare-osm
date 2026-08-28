@@ -157,6 +157,29 @@ def main():
     coords = collections.Counter((r["lat"], r["lon"]) for r in rows)
     dup = sum(n for n in coords.values() if n > 1)
 
+    # 同じ座標を別の市区町村の施設が共有している行。
+    # 同じ建物に複数の診療所が入るのは普通なので、重なり自体は欠陥ではない。
+    # 市区町村が違えば話は別で、同じ点が両方の住所であることはありえない。
+    # 少なくとも一方の座標が誤っている。
+    #
+    # どれが正しいかは機械的に決まらないので、座標は動かさず一覧に出す。
+    # 距離や位置レベルを使う判定は要らない。重なりと市区町村の一致だけで済む。
+    same_point = collections.defaultdict(list)
+    for r in rows:
+        same_point[(r["lat"], r["lon"])].append(r)
+    for members in same_point.values():
+        if len(members) < 2:
+            continue
+        cities = {(r.get("都道府県コード", ""), r.get("addr:city", ""))
+                  for r in members}
+        if len(cities) < 2:
+            continue
+        names = "、".join(sorted({r.get("addr:city", "") or "(不明)"
+                                 for r in members}))
+        for r in members:
+            add("coord_cross_city", r["ID"],
+                f"同じ座標を別の市区町村の{len(members)}件が共有: {names}")
+
     out = os.path.join(os.path.dirname(csv_path) or ".",
                        os.path.basename(base) + "_validation.csv")
     with open(out, "w", encoding="utf-8-sig", newline="") as f:
@@ -173,7 +196,8 @@ def main():
     for k in ("geojson_structure", "count_mismatch", "id_mismatch", "coord_order",
               "coord_range", "name_missing", "type_missing", "unknown_value",
               "bad_website", "bad_key", "tag_too_long", "control_char", "untrimmed",
-              "addr_hierarchy", "addr_note_chiban", "addr_province_mismatch"):
+              "addr_hierarchy", "addr_note_chiban", "addr_province_mismatch",
+              "coord_cross_city"):
         items = issues.get(k, [])
         print(f"  {k:<18}: {len(items):,}")
         for ident, detail in items[:2]:
@@ -188,7 +212,7 @@ def main():
     # 値は落とさずに残し、分割するかどうかは利用者が件数を見て判断する。
     # 残す方針のものを fatal に算入すると、パイプライン全体が止まる。
     # 検出も件数表示も *_validation.csv への記録も従来どおり行う。
-    INFORMATIONAL = ("addr_note_chiban",)
+    INFORMATIONAL = ("addr_note_chiban", "coord_cross_city")
     fatal = sum(len(v) for k, v in issues.items() if k not in INFORMATIONAL)
     sys.exit(1 if fatal else 0)
 
