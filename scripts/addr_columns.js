@@ -103,7 +103,7 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
       out["位置レベル"] = String(level);
       out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
       out["要確認"] = "yes";
-      notes.push(`元データの座標が住所から${Math.round(drift).toLocaleString()}m離れているため住所側を採用`);
+      notes.push(`元データの座標がジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`);
       if (out["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${out["未解釈の文字列"]}`);
       out["備考"] = notes.join(" / ");
       return out;
