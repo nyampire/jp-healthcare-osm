@@ -12,6 +12,7 @@
 
 import csv
 import os
+import json
 import shutil
 import subprocess
 import sys
@@ -57,7 +58,38 @@ def main():
             failed += 1
         print(f"  {'PASS' if ok else 'FAIL'}  不正データで終了コード 1 を返す")
 
-        total = len(EXPECTED) + 2
+        # addr_note_chiban だけを含むファイルは通さなければならない。
+        # 住居表示未実施の町字では NJA が解決できなかった残余が note に残り、
+        # その数字は実質的に地番になる。値は落とさず残す方針なので、
+        # 分割するかどうかは利用者が件数を見て判断する。
+        # ここで落とすと、方針として残している事象でパイプライン全体が止まる。
+        only = os.path.join(tmp, "only_note_chiban")
+        with open(os.path.join(tmp, "bad_osm.csv"), encoding="utf-8-sig",
+                  newline="") as f:
+            reader = csv.DictReader(f)
+            header = reader.fieldnames
+            rows = [x for x in reader if x["ID"] == "T04"]
+        with open(only + ".csv", "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=header)
+            w.writeheader()
+            w.writerows(rows)
+        with open(os.path.join(tmp, "bad_osm.geojson"), encoding="utf-8") as f:
+            gj = json.load(f)
+        gj["features"] = [x for x in gj["features"]
+                          if x["properties"].get("_id") == "T04"]
+        with open(only + ".geojson", "w", encoding="utf-8") as f:
+            json.dump(gj, f, ensure_ascii=False)
+        r2 = subprocess.run(
+            [sys.executable, os.path.join(ROOT, "scripts", "validate_osm.py"), only],
+            capture_output=True, text=True)
+        ok = r2.returncode == 0
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  addr_note_chiban だけなら終了コード 0 を返す")
+        if not ok:
+            print(f"        期待: 0 / 実際: {r2.returncode}")
+
+        total = len(EXPECTED) + 3
         print(f"\n  {total - failed}/{total} 件")
         return 1 if failed else 0
     finally:

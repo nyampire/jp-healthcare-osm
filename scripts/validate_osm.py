@@ -183,8 +183,14 @@ def main():
     for k, n in value_use.most_common():
         print(f"    {k:<24} {n:>8,}")
     print(f"\n詳細: {out}")
-    total = sum(len(v) for v in issues.values())
-    sys.exit(1 if total else 0)
+    # addr_note_chiban は欠陥ではなく申し送り。住居表示未実施の町字で
+    # NJA が解決できなかった残余が note に残り、その数字は実質的に地番になる。
+    # 値は落とさずに残し、分割するかどうかは利用者が件数を見て判断する。
+    # 残す方針のものを fatal に算入すると、パイプライン全体が止まる。
+    # 検出も件数表示も *_validation.csv への記録も従来どおり行う。
+    INFORMATIONAL = ("addr_note_chiban",)
+    fatal = sum(len(v) for k, v in issues.items() if k not in INFORMATIONAL)
+    sys.exit(1 if fatal else 0)
 
 
 if __name__ == "__main__":
