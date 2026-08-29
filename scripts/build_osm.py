@@ -223,6 +223,17 @@ def main():
             notes.append(why)
             stat["opening_hours を短縮" if oh else "opening_hours を落とした"] += 1
 
+        # 推定の番地は出さない。台帳と突き合わせられた8,219件のうち番地が
+        # 実在したのは33.9%で、街区符号が100を超える545件は0%だった。
+        # 誤った番地は OSM 上で別の建物を指すため、無いほうがましと判断した。
+        # 元の住所文字列は addr:full に全件残るので、情報は失われない。
+        # 対象は 番地の根拠 列で数えられる。
+        inferred = g.get("番地の根拠", "") == "推定"
+        block_number = "" if inferred else g.get("addr:block_number", "")
+        housenumber = "" if inferred else g.get("addr:housenumber", "")
+        if inferred and (g.get("addr:block_number") or g.get("addr:housenumber")):
+            notes.append("番地が推定のため addr:block_number と addr:housenumber を出さない")
+
         tags = {
             "amenity": ft["amenity"].strip(),
             "healthcare": ft["healthcare"].strip(),
@@ -243,8 +254,8 @@ def main():
             "addr:suburb": g.get("addr:suburb", ""),
             "addr:quarter": g.get("addr:quarter", ""),
             "addr:neighbourhood": g.get("addr:neighbourhood", ""),
-            "addr:block_number": g.get("addr:block_number", ""),
-            "addr:housenumber": g.get("addr:housenumber", ""),
+            "addr:block_number": block_number,
+            "addr:housenumber": housenumber,
             "note": g.get("未解釈の文字列", ""),
             "fixme": g.get("fixme", ""),
             "beds": beds_tag,

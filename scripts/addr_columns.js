@@ -1,4 +1,52 @@
 /**
+ * 推定になった行を照合し直すための住所を組む。
+ *
+ * NJA は入力の番地の後ろに建物名や階が続くと住居表示の明細照合を外し、
+ * 番地を推定として返す。切り出した番地だけを使って住所を組み直すと、
+ * 同じ番地で明細が取れることがある。本番データでは推定30,931件のうち
+ * 2,811件がそれで、組み直しの結果は元の番地と1件も食い違わなかった。
+ *
+ * 街区符号が無い行は組まない。組んでも町字までの住所にしかならず、
+ * 明細は取れないので通し直す意味がない。
+ */
+function recheckAddress(nja) {
+  const blk = (nja["addr:block_number"] || "").trim();
+  if (!blk) return "";
+  const head = ["addr:province", "addr:county", "addr:city", "addr:suburb",
+    "addr:quarter", "addr:neighbourhood"]
+    .map((k) => (nja[k] || "").trim()).join("");
+  const hn = (nja["addr:housenumber"] || "").trim();
+  return `${head}${blk}番${hn ? `${hn}号` : ""}`;
+}
+
+/**
+ * 照合し直した結果を採るかどうかを決める。
+ *
+ * 採るのは、元が推定で、組み直しが照合済みになり、番地が変わらなかった場合だけ。
+ * 番地が変わるのは組み直しが別の場所を指したときで、本番データでは0件だった。
+ * 起きたときに黙って値が入れ替わると追えなくなるので、採らない側に倒す。
+ *
+ * 座標も明細のものに差し替える。差し替えないと、照合済みなのに位置レベルが
+ * 町字の代表点のままになり、1kmの規則が効かない行ができてしまう。
+ *
+ * 採らないときは null を返す。
+ */
+function adoptRecheck(first, second) {
+  if (first["_番地の根拠"] !== "推定") return null;
+  if (second["_番地の根拠"] !== "照合済み") return null;
+  const same = (k) => (first[k] || "").trim() === (second[k] || "").trim();
+  if (!same("addr:block_number") || !same("addr:housenumber")) return null;
+  return {
+    "_番地の根拠": "照合済み",
+    "addr:block_number": second["addr:block_number"],
+    "addr:housenumber": second["addr:housenumber"],
+    "_lat": second["_lat"],
+    "_lng": second["_lng"],
+    "_座標精度": second["_座標精度"],
+  };
+}
+
+/**
  * 住所から得た点だけを見て、座標を採るかどうかを決める。
  *
  * 元データが座標を持たない行と、元データの座標を穴埋めと判断して捨てた行の
@@ -175,6 +223,7 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
 }
 
 module.exports = {
-  foldColumns, resolveFromAddress, distanceMeters, usable,
+  foldColumns, resolveFromAddress, recheckAddress, adoptRecheck,
+  distanceMeters, usable,
   ADDR_KEYS, POINT_LEVEL_NOTE, MAX_DRIFT_METERS,
 };

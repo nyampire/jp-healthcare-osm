@@ -10,7 +10,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { foldColumns } = require("./addr_columns.js");
+const { foldColumns, recheckAddress, adoptRecheck } = require("./addr_columns.js");
 
 const ROOT = path.dirname(__dirname);
 const FIXTURE = path.join(ROOT, "tests", "known_bad_addr.csv");
@@ -70,6 +70,7 @@ function main() {
   }
   console.log("すべて期待どおりに分類された");
 
+  checkRecheck();
   checkStartupGuard();
 }
 
@@ -121,6 +122,65 @@ function checkStartupGuard() {
     }
   }
   fs.rmSync(dir, { recursive: true, force: true });
+  if (failed) process.exit(1);
+}
+
+/**
+ * 推定の照合し直しを検査する。
+ *
+ * NJA は入力に建物名が続くと住居表示の明細照合を外し、番地を推定として返す。
+ * 番地だけの住所に組み直して通し直すと明細が取れることがあり、本番データでは
+ * 30,931件中2,811件がそれだった。組み直す文字列と、採用の条件を確かめる。
+ */
+function checkRecheck() {
+  console.log("");
+  const cases = [];
+
+  const base = {
+    "addr:country": "JP", "addr:province": "北海道", "addr:county": "",
+    "addr:city": "札幌市", "addr:suburb": "中央区", "addr:quarter": "",
+    "addr:neighbourhood": "北11条西15丁目",
+    "addr:block_number": "2", "addr:housenumber": "1",
+    "_番地の根拠": "推定",
+  };
+  cases.push(["建物名を落として番地だけの住所を組む",
+    recheckAddress(base) === "北海道札幌市中央区北11条西15丁目2番1号",
+    recheckAddress(base)]);
+
+  const noHouse = { ...base, "addr:housenumber": "" };
+  cases.push(["住居番号が無ければ番までで組む",
+    recheckAddress(noHouse) === "北海道札幌市中央区北11条西15丁目2番",
+    recheckAddress(noHouse)]);
+
+  const noBlock = { ...base, "addr:block_number": "", "addr:housenumber": "" };
+  cases.push(["街区符号が無ければ組まない",
+    recheckAddress(noBlock) === "", recheckAddress(noBlock)]);
+
+  const verified = { "_番地の根拠": "照合済み", "addr:block_number": "2",
+    "addr:housenumber": "1", "_lat": "43.07", "_lng": "141.33", "_座標精度": "8" };
+  const got = adoptRecheck(base, verified);
+  cases.push(["照合済みになれば採用する", got !== null && got["_番地の根拠"] === "照合済み", String(got && got["_番地の根拠"])]);
+  cases.push(["採用時は座標も明細のものに差し替える",
+    got !== null && got["_lat"] === "43.07" && got["_座標精度"] === "8",
+    String(got && got["_lat"])]);
+
+  cases.push(["推定のままなら採用しない",
+    adoptRecheck(base, { ...verified, "_番地の根拠": "推定" }) === null, ""]);
+
+  // 番地が変わるのは組み直しが別の場所を指した場合で、本番データでは0件だった。
+  // 起きたときに黙って値が入れ替わらないよう、採用しない側に倒す。
+  cases.push(["番地が食い違えば採用しない",
+    adoptRecheck(base, { ...verified, "addr:housenumber": "9" }) === null, ""]);
+
+  cases.push(["元が推定でなければ採用しない",
+    adoptRecheck({ ...base, "_番地の根拠": "照合済み" }, verified) === null, ""]);
+
+  let failed = 0;
+  for (const [name, ok, actual] of cases) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
+    if (!ok && actual) console.log(`        実際: ${actual}`);
+  }
   if (failed) process.exit(1);
 }
 
