@@ -1,4 +1,51 @@
 /**
+ * 住所から得た点だけを見て、座標を採るかどうかを決める。
+ *
+ * 元データが座標を持たない行と、元データの座標を穴埋めと判断して捨てた行の
+ * どちらもここを通る。判断の分かれ目を2箇所に書くと必ず食い違うので、
+ * foldColumns と fix_placeholder_coords.js の両方からこれを呼ぶ。
+ *
+ * 返す 説明 は 備考 に積む1文。fields はそのまま出力列に重ねられる。
+ */
+function resolveFromAddress({ lat, lng, level, note }, adoptLevel) {
+  const fields = {
+    lat: "", lon: "", "座標の出典": "", "補完しなかった理由": "", "要確認": "",
+    "位置レベル": level === null || level === undefined ? "" : String(level),
+    "位置レベルの意味": POINT_LEVEL_NOTE[level] || "",
+  };
+
+  if (note === "地番方式のため対象外") {
+    fields["座標の出典"] = "なし";
+    fields["補完しなかった理由"] = "地番方式";
+    fields["要確認"] = "yes";
+    return { fields, 説明: "地番方式の住所のため座標を補完しない" };
+  }
+  if (!usable(lat) || !usable(lng)) {
+    fields["座標の出典"] = "なし";
+    fields["補完しなかった理由"] = "解決できず";
+    fields["要確認"] = "yes";
+    return { fields, 説明: "住所から座標を解決できなかった" };
+  }
+  if (level !== null && level !== undefined && level >= adoptLevel) {
+    fields.lat = String(lat);
+    fields.lon = String(lng);
+    fields["座標の出典"] = "ジオコーディング";
+    return {
+      fields,
+      説明: `住所から付与（位置レベル${level}、${fields["位置レベルの意味"]}）`,
+    };
+  }
+  fields["座標の出典"] = "なし";
+  fields["補完しなかった理由"] = "位置レベル不足";
+  fields["要確認"] = "yes";
+  return {
+    fields,
+    説明: `位置レベル${level === null || level === undefined ? "不明" : level}`
+      + `${fields["位置レベルの意味"] ? `（${fields["位置レベルの意味"]}）` : ""}のため採用しない`,
+  };
+}
+
+/**
  * nja-osm-tags のバッチ出力1行と、元データの座標を、出力列に畳む。
  *
  * バッチには --lat-column / --lng-column を渡さない。
@@ -117,37 +164,17 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
     return out;
   }
 
-  if (level !== null) {
-    out["位置レベル"] = String(level);
-    out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
-  }
-
-  if (nja["_備考"] === "地番方式のため対象外") {
-    out["座標の出典"] = "なし";
-    out["補完しなかった理由"] = "地番方式";
-    out["要確認"] = "yes";
-    notes.push("地番方式の住所のため座標を補完しない");
-  } else if (!usable(nja["_lat"]) || !usable(nja["_lng"])) {
-    out["座標の出典"] = "なし";
-    out["補完しなかった理由"] = "解決できず";
-    out["要確認"] = "yes";
-    notes.push("住所から座標を解決できなかった");
-  } else if (level !== null && level >= adoptLevel) {
-    out.lat = nja["_lat"];
-    out.lon = nja["_lng"];
-    out["座標の出典"] = "ジオコーディング";
-    notes.push(`住所から付与（位置レベル${level}、${out["位置レベルの意味"]}）`);
-  } else {
-    out["座標の出典"] = "なし";
-    out["補完しなかった理由"] = "位置レベル不足";
-    out["要確認"] = "yes";
-    notes.push(`位置レベル${level === null ? "不明" : level}`
-      + `${out["位置レベルの意味"] ? `（${out["位置レベルの意味"]}）` : ""}のため採用しない`);
-  }
+  const r = resolveFromAddress(
+    { lat: nja["_lat"], lng: nja["_lng"], level, note: nja["_備考"] }, adoptLevel);
+  Object.assign(out, r.fields);
+  notes.push(r.説明);
 
   if (out["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${out["未解釈の文字列"]}`);
   out["備考"] = notes.join(" / ");
   return out;
 }
 
-module.exports = { foldColumns, ADDR_KEYS, POINT_LEVEL_NOTE, MAX_DRIFT_METERS };
+module.exports = {
+  foldColumns, resolveFromAddress, distanceMeters, usable,
+  ADDR_KEYS, POINT_LEVEL_NOTE, MAX_DRIFT_METERS,
+};
