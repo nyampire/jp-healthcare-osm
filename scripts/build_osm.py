@@ -169,6 +169,20 @@ def write_osm_files(base, rows, features, keys):
                   f, ensure_ascii=False)
 
 
+def clean_old_pref_files(out_dir, sector):
+    """前回実行で残った都道府県別ファイルを掃除する。
+
+    os.makedirs は既存ファイルを消さないため、今回0件になった県の
+    <前回のコード>_<県名>_<業態>.csv/.geojson が残り続け、「osm/ は配るものが
+    そのまま入っている場所」という前提が崩れる。書き出す前にここで消す。
+    パターンを都道府県コード2桁 + 業態名に絞るのは、同じディレクトリにある
+    全国ファイル（<業態>_osm.csv 等）や無関係なファイルを誤って消さないため。
+    """
+    for ext in (".csv", ".geojson"):
+        for path in glob.glob(os.path.join(out_dir, f"[0-9][0-9]_*_{sector}{ext}")):
+            os.remove(path)
+
+
 def split_by_pref(rows, features, keys, out_dir, sector):
     """都道府県ごとにファイルを分ける。
 
@@ -192,6 +206,7 @@ def split_by_pref(rows, features, keys, out_dir, sector):
         groups[code][1].append(feat)
 
     os.makedirs(out_dir, exist_ok=True)
+    clean_old_pref_files(out_dir, sector)
     for code in sorted(groups):
         grows, gfeats = groups[code]
         base = os.path.join(out_dir, f"{code}_{PREF[code]}_{sector}")

@@ -31,6 +31,7 @@ import collections
 import csv
 import json
 import os
+import shutil
 import sys
 
 from prefectures import PREF
@@ -75,6 +76,12 @@ def main():
             groups[key].append(r)
 
         out_sub = os.path.join(mr_dir, sector)
+        # 前回実行の残骸を掃除する。このブランチで県別ファイル名に業態を
+        # 付けたため、旧 output/ を持つ環境で実行すると新旧2系統のファイルが
+        # 同居しうる。index.csv は新名しか載せないので突き合わせでは気づけない。
+        # out_sub はこの業態専用のディレクトリで他の何も置かないため、
+        # 中身をまるごと消してよい。
+        shutil.rmtree(out_sub, ignore_errors=True)
         os.makedirs(out_sub, exist_ok=True)
         for key in sorted(groups):
             name = (f"{key}_{PREF.get(key, key)}_{sector}"
