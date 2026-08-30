@@ -77,7 +77,8 @@ def main():
         out_sub = os.path.join(mr_dir, sector)
         os.makedirs(out_sub, exist_ok=True)
         for key in sorted(groups):
-            name = f"{key}_{PREF.get(key, key)}" if args.split == "pref" else sector
+            name = (f"{key}_{PREF.get(key, key)}_{sector}"
+                    if args.split == "pref" else sector)
             path = os.path.join(out_sub, f"{name}.geojson")
             with open(path, "w", encoding="utf-8") as f:
                 for r in groups[key]:
