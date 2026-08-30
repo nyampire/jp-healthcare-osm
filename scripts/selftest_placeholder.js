@@ -53,8 +53,10 @@ function readRecords(file) {
 function main() {
   console.log("=== fix_placeholder_coords.js 逆テスト ===\n");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "osm-iryo-placeholder-"));
+  const buildDir = path.join(dir, "build");
+  fs.mkdirSync(buildDir, { recursive: true });
   for (const [sector, src] of FIXTURES) {
-    fs.copyFileSync(src, path.join(dir, `${sector}_geocoded.csv`));
+    fs.copyFileSync(src, path.join(buildDir, `${sector}_geocoded.csv`));
   }
 
   execFileSync("node", [path.join(__dirname, "fix_placeholder_coords.js"),
@@ -63,7 +65,7 @@ function main() {
   const fail = [];
   let n = 0;
   for (const [sector] of FIXTURES) {
-    for (const rec of readRecords(path.join(dir, `${sector}_geocoded.csv`))) {
+    for (const rec of readRecords(path.join(buildDir, `${sector}_geocoded.csv`))) {
       n++;
       const checks = [
         ["座標の出典", rec["座標の出典"], rec["期待_座標の出典"]],

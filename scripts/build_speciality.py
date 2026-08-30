@@ -206,8 +206,9 @@ def main():
         if unmapped:
             stats["未対応あり"] += 1
 
-    os.makedirs(args.out_dir, exist_ok=True)
-    with open(os.path.join(args.out_dir, f"{sector}_speciality.csv"), "w",
+    build_dir = os.path.join(args.out_dir, "build")
+    os.makedirs(build_dir, exist_ok=True)
+    with open(os.path.join(build_dir, f"{sector}_speciality.csv"), "w",
               encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["ID", "正式名称", "都道府県コード", "healthcare:speciality",

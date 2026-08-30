@@ -699,8 +699,10 @@ def main():
     def meta(fid, key):
         return fac.get(fid, {}).get(key, "")
 
+    build_dir = os.path.join(args.out_dir, "build")
+    os.makedirs(build_dir, exist_ok=True)
     write_csv(
-        os.path.join(args.out_dir, f"{args.sector}_opening_hours.csv"),
+        os.path.join(build_dir, f"{args.sector}_opening_hours.csv"),
         ["ID", "正式名称", "都道府県コード", "opening_hours",
          "除外区間数", "日跨ぎ採用数", "矛盾曜日数", "要確認", "備考"],
         [[fid, m["name"], m["pref"], oh[fid], exc_by_fac[fid], overnight[fid],

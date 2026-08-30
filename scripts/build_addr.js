@@ -282,8 +282,9 @@ async function main() {
     ]);
   }
 
-  fs.mkdirSync(outDir, { recursive: true });
-  const file = path.join(outDir, `${sector}_geocoded.csv`);
+  const buildDir = path.join(outDir, "build");
+  fs.mkdirSync(buildDir, { recursive: true });
+  const file = path.join(buildDir, `${sector}_geocoded.csv`);
   fs.writeFileSync(file, "﻿" + toCsv(out));
 
   console.log(`\n施設数       : ${(out.length - 1).toLocaleString()}`);

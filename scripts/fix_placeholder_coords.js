@@ -96,7 +96,7 @@ function main() {
   // 全業態を読む。判定1は業態をまたいで数えないと成立しない
   const files = [];
   for (const sector of SECTORS) {
-    const file = path.join(outDir, `${sector}_geocoded.csv`);
+    const file = path.join(outDir, "build", `${sector}_geocoded.csv`);
     if (!fs.existsSync(file)) continue;
     const rows = parseCsv(fs.readFileSync(file, "utf8"));
     const header = rows.shift();

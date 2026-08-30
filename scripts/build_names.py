@@ -404,8 +404,9 @@ def main():
             if review:
                 stats["要確認"] += 1
 
-    os.makedirs(args.out_dir, exist_ok=True)
-    out = os.path.join(args.out_dir, f"{args.sector}_names.csv")
+    build_dir = os.path.join(args.out_dir, "build")
+    os.makedirs(build_dir, exist_ok=True)
+    out = os.path.join(build_dir, f"{args.sector}_names.csv")
     with open(out, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["ID",

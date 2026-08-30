@@ -146,10 +146,11 @@ def main():
     print(f"業態     : {label}")
     print(f"施設票   : {os.path.basename(src)}")
 
-    geo = read_csv(os.path.join(args.out_dir, f"{args.sector}_geocoded.csv"))
-    names = read_csv(os.path.join(args.out_dir, f"{args.sector}_names.csv"))
-    hours = read_csv(os.path.join(args.out_dir, f"{args.sector}_opening_hours.csv"))
-    spec = read_csv(os.path.join(args.out_dir, f"{args.sector}_speciality.csv"))
+    build_dir = os.path.join(args.out_dir, "build")
+    geo = read_csv(os.path.join(build_dir, f"{args.sector}_geocoded.csv"))
+    names = read_csv(os.path.join(build_dir, f"{args.sector}_names.csv"))
+    hours = read_csv(os.path.join(build_dir, f"{args.sector}_opening_hours.csv"))
+    spec = read_csv(os.path.join(build_dir, f"{args.sector}_speciality.csv"))
     for label_, d in (("座標", geo), ("名称", names), ("時間", hours)):
         if not d:
             sys.exit(f"{label_}の生成結果がありません。先に build を実行してください。")
