@@ -63,7 +63,7 @@ def main():
     index = []
 
     for sector in sectors:
-        src = os.path.join(args.out_dir, f"{sector}_osm.csv")
+        src = os.path.join(args.out_dir, "osm", sector, f"{sector}_osm.csv")
         if not os.path.exists(src):
             sys.exit(f"入力がありません: {src}\n先に build_osm.py を実行してください。")
         with open(src, encoding="utf-8-sig", newline="") as f:

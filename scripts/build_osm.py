@@ -33,6 +33,8 @@ import os
 import re
 import sys
 
+from prefectures import PREF
+
 SECTORS = {
     "hospital": ("病院", "01-1_hospital_facility_info_*.csv", "正式名称"),
     "clinic": ("診療所", "02-1_clinic_facility_info_*.csv", "正式名称"),
@@ -130,6 +132,42 @@ def clean_url(value):
     if RE_BARE_DOMAIN.match(v):
         return f"https://{v}", f"スキームが無いため https を補った: {v[:60]}"
     return "", f"website に使えない形式のため出力しない: {v[:60]}"
+
+
+def split_by_pref(rows, features, keys, out_dir, sector):
+    """都道府県ごとにファイルを分ける。
+
+    OSM への投入は地域単位で行うため、全国1ファイルからの切り出しを
+    毎回やらずに済むようにする。県名は prefectures.PREF から取る。
+    ここで表とデータの乖離を落とすのは、黙って '99_99_hospital.csv' の
+    ような名前のファイルが出るのを防ぐため。
+    """
+    groups = {}
+    for row, feat in zip(rows, features):
+        code = (row[1] or "").strip()
+        if not code:
+            sys.exit(f"都道府県コードが空の行があります: ID={row[0]}")
+        if code not in PREF:
+            sys.exit(f"都道府県コードが表にありません: {code} (ID={row[0]})")
+        groups.setdefault(code, ([], []))
+        groups[code][0].append(row)
+        groups[code][1].append(feat)
+
+    os.makedirs(out_dir, exist_ok=True)
+    for code in sorted(groups):
+        grows, gfeats = groups[code]
+        base = os.path.join(out_dir, f"{code}_{PREF[code]}_{sector}")
+        with open(base + ".csv", "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["ID", "都道府県コード", "lat", "lon", "座標の出典"] + keys
+                       + ["要確認", "備考"])
+            for fid, pref, la, lo, origin, tags, review, note in grows:
+                w.writerow([fid, pref, la, lo, origin]
+                           + [tags.get(k, "") for k in keys] + [review, note])
+        with open(base + ".geojson", "w", encoding="utf-8") as f:
+            json.dump({"type": "FeatureCollection", "features": gfeats},
+                      f, ensure_ascii=False)
+    return len(groups)
 
 
 def main():
@@ -283,8 +321,9 @@ def main():
             "addr:suburb", "addr:quarter", "addr:neighbourhood",
             "addr:block_number", "addr:housenumber", "note", "fixme",
             "beds", "source"]
-    os.makedirs(args.out_dir, exist_ok=True)
-    csv_path = os.path.join(args.out_dir, f"{args.sector}_osm.csv")
+    osm_dir = os.path.join(args.out_dir, "osm", args.sector)
+    os.makedirs(osm_dir, exist_ok=True)
+    csv_path = os.path.join(osm_dir, f"{args.sector}_osm.csv")
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["ID", "都道府県コード", "lat", "lon", "座標の出典"] + keys
@@ -293,10 +332,13 @@ def main():
             w.writerow([fid, pref, la, lo, origin]
                        + [tags.get(k, "") for k in keys] + [review, note])
 
-    gj_path = os.path.join(args.out_dir, f"{args.sector}_osm.geojson")
+    gj_path = os.path.join(osm_dir, f"{args.sector}_osm.geojson")
     with open(gj_path, "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": features},
                   f, ensure_ascii=False)
+
+    n_pref = split_by_pref(rows, features, keys, osm_dir, args.sector)
+    print(f"都道府県別 : {n_pref} 件のファイル対を書き出しました")
 
     print()
     for k in sorted(stat):
