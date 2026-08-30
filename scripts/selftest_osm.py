@@ -24,6 +24,7 @@
   検出されるのが正しい。
 """
 
+import collections
 import csv
 import os
 import json
@@ -108,7 +109,67 @@ def main():
         if not ok:
             print(f"        期待: 0 / 実際: {r2.returncode}")
 
-        total = len(EXPECTED) + 3
+        # 都道府県別ファイルとの検算（I-2）。県別ファイルが無いときに何も
+        # 検出しないことは上のブロックまでの実行（bad_osm と同じ tmp に
+        # 県別ファイルを一切置いていない）で既に確かめている。ここでは
+        # 県別ファイルを実際に置いた4つの分岐（一致 / 件数ずれ / 県が丸ごと
+        # 無い / 全国に無いコードが紛れる）を確かめる。件数は bad_osm.csv の
+        # 都道府県コードから動かないよう都度数え直し、ハードコードしない。
+        with open(os.path.join(tmp, "bad_osm.csv"), encoding="utf-8-sig",
+                  newline="") as f:
+            code_counts = collections.Counter(
+                x["都道府県コード"] for x in csv.DictReader(f))
+
+        def write_pref_csv(code, n):
+            path = os.path.join(tmp, f"{code}_pref{code}_bad.csv")
+            with open(path, "w", encoding="utf-8-sig", newline="") as f:
+                w = csv.writer(f)
+                w.writerow(["ID", "都道府県コード"])
+                w.writerows([[f"{code}-{i}", code] for i in range(n)])
+
+        def pref_split_kinds():
+            subprocess.run(
+                [sys.executable, os.path.join(ROOT, "scripts", "validate_osm.py"),
+                 os.path.join(tmp, "bad_osm")],
+                capture_output=True, text=True)
+            with open(report, encoding="utf-8-sig", newline="") as f:
+                return {x["種別"] for x in csv.DictReader(f)}
+
+        PREF_SPLIT_KINDS = {"pref_split_row_mismatch", "pref_split_missing",
+                            "pref_split_extra"}
+        first_code = next(iter(code_counts))
+
+        for code, n in code_counts.items():
+            write_pref_csv(code, n)
+        ok = not (pref_split_kinds() & PREF_SPLIT_KINDS)
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  都道府県別ファイルが一致していれば検出しない")
+
+        write_pref_csv(first_code, code_counts[first_code] - 1)  # 1件減らし、合計をずらす
+        ok = "pref_split_row_mismatch" in pref_split_kinds()
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  都道府県別ファイルの合計が全国とずれると検出する")
+
+        write_pref_csv(first_code, code_counts[first_code])  # 件数を戻し、他の1県分を丸ごと消す
+        missing_code = next(c for c in code_counts if c != first_code)
+        os.remove(os.path.join(tmp, f"{missing_code}_pref{missing_code}_bad.csv"))
+        ok = "pref_split_missing" in pref_split_kinds()
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  都道府県が丸ごと無いと検出する")
+
+        write_pref_csv(missing_code, code_counts[missing_code])  # 元に戻し、無いコードを1つ足す
+        extra_code = next(c for c in ("01", "02", "03") if c not in code_counts)
+        write_pref_csv(extra_code, 1)
+        ok = "pref_split_extra" in pref_split_kinds()
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  全国データに無い都道府県コードのファイルを検出する")
+        os.remove(os.path.join(tmp, f"{extra_code}_pref{extra_code}_bad.csv"))
+
+        total = len(EXPECTED) + 3 + 4
         print(f"\n  {total - failed}/{total} 件")
         return 1 if failed else 0
     finally:

@@ -9,6 +9,8 @@
   * amenity と healthcare の値が OSM の語彙にあるか
   * name が空の地物が無いか
   * addr:province が都道府県コードと一致するか
+  * 都道府県別ファイルがあれば、行数の合計と都道府県コードの集合が全国ファイルと
+    一致するか（無ければ何もしない）
 
 終了コード: 欠陥が 1 件でもあれば 1、なければ 0。
 """
@@ -16,6 +18,7 @@
 import argparse
 import collections
 import csv
+import glob
 import json
 import os
 import re
@@ -158,6 +161,39 @@ def main():
             if v != v.strip():
                 add("untrimmed", fid, f"{k} の前後に空白がある")
 
+    # 都道府県別ファイルとの検算。県別分割はこのブランチの中心的な不変条件
+    # なのに、確かめるコードが本番のパイプラインに無かった。検証対象と同じ
+    # ディレクトリに <業態>別ファイルがあれば、行数の合計と都道府県コードの
+    # 集合が全国ファイルと一致するか確かめる。無ければ何もしない
+    # （selftest_osm.py は県別ファイルの無い一時ディレクトリで実行される）。
+    #
+    # ここで都道府県コードの集合まで見るのは、build_osm.py が最後に出す
+    # 「都道府県別 : N 件のファイル対を書き出しました」の N を誰も検査して
+    # おらず、ある県が丸ごと落ちても終了コード0になっていたため。
+    sector = re.sub(r"_osm$", "", os.path.basename(base))
+    pref_dir = os.path.dirname(csv_path) or "."
+    pref_files = sorted(glob.glob(os.path.join(pref_dir, f"[0-9][0-9]_*_{sector}.csv")))
+    if pref_files:
+        total_split = 0
+        codes_split = set()
+        for pf in pref_files:
+            with open(pf, encoding="utf-8-sig", newline="") as f:
+                total_split += sum(1 for _ in csv.DictReader(f))
+            codes_split.add(os.path.basename(pf)[:2])
+        if total_split != len(rows):
+            add("pref_split_row_mismatch", "-",
+                f"都道府県別ファイルの合計 {total_split:,} 件に対し全国 {len(rows):,} 件")
+        codes_national = {r["都道府県コード"] for r in rows if r.get("都道府県コード")}
+        missing = codes_national - codes_split
+        if missing:
+            add("pref_split_missing", "-",
+                f"都道府県別ファイルが無いコード: {','.join(sorted(missing))}")
+        extra = codes_split - codes_national
+        if extra:
+            add("pref_split_extra", "-",
+                f"全国ファイルに無い都道府県コードの都道府県別ファイル: "
+                f"{','.join(sorted(extra))}")
+
     # 同一座標に複数の施設が乗っていないか
     coords = collections.Counter((r["lat"], r["lon"]) for r in rows)
     dup = sum(n for n in coords.values() if n > 1)
@@ -203,7 +239,8 @@ def main():
               "coord_range", "name_missing", "type_missing", "unknown_value",
               "bad_website", "bad_key", "tag_too_long", "control_char", "untrimmed",
               "addr_hierarchy", "addr_note_chiban", "addr_province_mismatch",
-              "coord_cross_city"):
+              "coord_cross_city", "pref_split_row_mismatch", "pref_split_missing",
+              "pref_split_extra"):
         items = issues.get(k, [])
         print(f"  {k:<18}: {len(items):,}")
         for ident, detail in items[:2]:
