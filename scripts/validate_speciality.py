@@ -52,7 +52,7 @@ IN_USE_VALUES = {
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("target", nargs="?",
-                   default=os.path.join("output", "speciality.csv"))
+                   default=os.path.join("output", "build", "hospital_speciality.csv"))
     p.add_argument("--report-dir", default=None,
                    help="検証結果の出力先。既定は入力ファイルと同じディレクトリ")
     args = p.parse_args()

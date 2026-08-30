@@ -90,9 +90,34 @@ function parseCsv(text) {
   return rows;
 }
 
+/**
+ * process.argv からオプションを取り除いた最初の位置引数を target として返す。
+ * target は process.argv[2] 固定にしていたが、--report-dir は argv 全体を
+ * 走査するため `--report-dir output/reports foo.csv` の順で書くと target が
+ * "--report-dir" になってしまっていた。フラグとその値を先に取り除いてから
+ * 残りの最初の要素を見る。
+ */
+function parseArgs(argv) {
+  const FLAGS_WITH_VALUE = new Set(["--report-dir"]);
+  const positional = [];
+  let reportDir = null;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (FLAGS_WITH_VALUE.has(a)) {
+      if (a === "--report-dir") reportDir = argv[i + 1] || null;
+      i++;
+      continue;
+    }
+    positional.push(a);
+  }
+  return { target: positional[0] || null, reportDir };
+}
+
 function main() {
-  const target = process.argv[2] ||
-    path.join(__dirname, "..", "output", "opening_hours.csv");
+  const { target: targetArg, reportDir: reportDirArg } =
+    parseArgs(process.argv.slice(2));
+  const target = targetArg ||
+    path.join(__dirname, "..", "output", "build", "hospital_opening_hours.csv");
   if (!fs.existsSync(target)) {
     console.error(`入力ファイルがありません: ${target}`);
     console.error("先に scripts/build_opening_hours.py を実行してください。");
@@ -181,10 +206,6 @@ function main() {
   }
 
   // 検証結果は入力ファイル名から導く。業態ごとに実行しても上書きされないようにする。
-  const reportDirArg = (() => {
-    const i = process.argv.indexOf("--report-dir");
-    return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
-  })();
   const outDir = reportDirArg || path.dirname(target);
   fs.mkdirSync(outDir, { recursive: true });
   const reportName = path.basename(target).replace(/\.csv$/, "") + "_validation.csv";
