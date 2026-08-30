@@ -372,9 +372,10 @@ def main():
 
     osm_dir = os.path.join(args.out_dir, "osm", args.sector)
     os.makedirs(osm_dir, exist_ok=True)
-    csv_path = os.path.join(osm_dir, f"{args.sector}_osm.csv")
-    gj_path = os.path.join(osm_dir, f"{args.sector}_osm.geojson")
-    write_osm_files(os.path.join(osm_dir, f"{args.sector}_osm"), rows, features, keys)
+    # base を1回だけ組み立てて書き出しと表示の両方で使い回す。別々に組み立てると
+    # 片方だけ変えたときに「出力:」の表示が実際のファイルと食い違いうる。
+    base = os.path.join(osm_dir, f"{args.sector}_osm")
+    write_osm_files(base, rows, features, keys)
 
     n_pref = split_by_pref(rows, features, keys, osm_dir, args.sector)
     print(f"都道府県別 : {n_pref} 件のファイル対を書き出しました")
@@ -392,8 +393,8 @@ def main():
         n = filled[k]
         if n:
             print(f"    {k:<24} {n:>8,} ({n / max(len(rows), 1) * 100:5.1f}%)")
-    print(f"\n出力: {csv_path}")
-    print(f"      {gj_path}")
+    print(f"\n出力: {base}.csv")
+    print(f"      {base}.geojson")
 
 
 if __name__ == "__main__":
