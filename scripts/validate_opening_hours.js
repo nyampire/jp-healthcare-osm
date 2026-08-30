@@ -181,7 +181,12 @@ function main() {
   }
 
   // 検証結果は入力ファイル名から導く。業態ごとに実行しても上書きされないようにする。
-  const outDir = path.dirname(target);
+  const reportDirArg = (() => {
+    const i = process.argv.indexOf("--report-dir");
+    return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
+  })();
+  const outDir = reportDirArg || path.dirname(target);
+  fs.mkdirSync(outDir, { recursive: true });
   const reportName = path.basename(target).replace(/\.csv$/, "") + "_validation.csv";
   const report = [["種別", "ID", "正式名称", "opening_hours", "内容"]];
   const push = (kind, list) =>

@@ -701,6 +701,8 @@ def main():
 
     build_dir = os.path.join(args.out_dir, "build")
     os.makedirs(build_dir, exist_ok=True)
+    reports_dir = os.path.join(args.out_dir, "reports")
+    os.makedirs(reports_dir, exist_ok=True)
     write_csv(
         os.path.join(build_dir, f"{args.sector}_opening_hours.csv"),
         ["ID", "正式名称", "都道府県コード", "opening_hours",
@@ -714,7 +716,7 @@ def main():
          for fid, m in fac.items()])
 
     write_csv(
-        os.path.join(args.out_dir, f"{args.sector}_excluded.csv"),
+        os.path.join(reports_dir, f"{args.sector}_excluded.csv"),
         ["分類", "ID", "正式名称", "都道府県コード", "曜日", "時間帯",
          "診療科目コード", "診療科目名", "除外した値", "除外理由"],
         [[r[6], r[0], meta(r[0], "name"), meta(r[0], "pref"),
@@ -723,14 +725,14 @@ def main():
 
     if emergency:
         write_csv(
-            os.path.join(args.out_dir, f"{args.sector}_emergency.csv"),
+            os.path.join(reports_dir, f"{args.sector}_emergency.csv"),
             ["ID", "正式名称", "都道府県コード", "曜日", "時間帯",
              "診療科目コード", "診療科目名", "診療時間"],
             [[r[0], meta(r[0], "name"), meta(r[0], "pref"),
               r[1], r[2], r[3], r[4], r[5]] for r in emergency])
 
     write_csv(
-        os.path.join(args.out_dir, f"{args.sector}_conflicts.csv"),
+        os.path.join(reports_dir, f"{args.sector}_conflicts.csv"),
         ["ID", "正式名称", "都道府県コード", "曜日", "曜日フラグ", "時刻",
          "内容", "採用した判断"],
         [r + [decisions.get((r[0], r[3]), "")] for r in conflicts])

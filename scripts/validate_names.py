@@ -37,6 +37,8 @@ def load_prefixes(path):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("target")
+    p.add_argument("--report-dir", default=None,
+                   help="検証結果の出力先。既定は入力ファイルと同じディレクトリ")
     p.add_argument("--prefixes",
                    default=os.path.join("mapping", "name_entity_prefixes.csv"))
     args = p.parse_args()
@@ -88,7 +90,9 @@ def main():
 
     report = [[k, r["ID"], r[orig_col], r["name"], d]
               for k, items in issues.items() for r, d in items]
-    out = os.path.join(os.path.dirname(args.target) or ".",
+    report_dir = args.report_dir or os.path.dirname(args.target) or "."
+    os.makedirs(report_dir, exist_ok=True)
+    out = os.path.join(report_dir,
                        os.path.basename(args.target).replace(".csv", "")
                        + "_validation.csv")
     with open(out, "w", encoding="utf-8-sig", newline="") as f:

@@ -36,6 +36,8 @@ RE_URL = re.compile(r"^https?://\S+$")
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("prefix", help="output/<業態>_osm の接頭辞、または CSV のパス")
+    p.add_argument("--report-dir", default=None,
+                   help="検証結果の出力先。既定は入力ファイルと同じディレクトリ")
     args = p.parse_args()
     base = args.prefix[:-4] if args.prefix.endswith(".csv") else args.prefix
     csv_path, gj_path = base + ".csv", base + ".geojson"
@@ -180,8 +182,9 @@ def main():
             add("coord_cross_city", r["ID"],
                 f"同じ座標を別の市区町村の{len(members)}件が共有: {names}")
 
-    out = os.path.join(os.path.dirname(csv_path) or ".",
-                       os.path.basename(base) + "_validation.csv")
+    report_dir = args.report_dir or os.path.dirname(csv_path) or "."
+    os.makedirs(report_dir, exist_ok=True)
+    out = os.path.join(report_dir, os.path.basename(base) + "_validation.csv")
     with open(out, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["種別", "ID", "内容"])

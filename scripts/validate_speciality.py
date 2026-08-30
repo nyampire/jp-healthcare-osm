@@ -53,6 +53,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("target", nargs="?",
                    default=os.path.join("output", "speciality.csv"))
+    p.add_argument("--report-dir", default=None,
+                   help="検証結果の出力先。既定は入力ファイルと同じディレクトリ")
     args = p.parse_args()
     if not os.path.exists(args.target):
         sys.exit(f"入力ファイルがありません: {args.target}\n"
@@ -97,9 +99,11 @@ def main():
             report.append([kind, r["ID"], r["正式名称"],
                            r["healthcare:speciality"][:120], detail])
     # 検証結果は入力ファイル名から導く。業態ごとに実行しても上書きされないようにする。
-    out = os.path.join(
-        os.path.dirname(args.target) or ".",
-        os.path.basename(args.target).replace(".csv", "") + "_validation.csv")
+    report_dir = args.report_dir or os.path.dirname(args.target) or "."
+    os.makedirs(report_dir, exist_ok=True)
+    out = os.path.join(report_dir,
+                       os.path.basename(args.target).replace(".csv", "")
+                       + "_validation.csv")
     with open(out, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["種別", "ID", "正式名称", "healthcare:speciality", "内容"])
