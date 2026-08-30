@@ -686,7 +686,6 @@ def main():
     decisions, withheld = resolve_conflicts(intervals, fac)
     oh, applied = build_opening_hours(intervals, fac, profile, withheld)
 
-    os.makedirs(args.out_dir, exist_ok=True)
     exc_by_fac = collections.Counter(r[0] for r in excluded)
     con_by_fac = collections.Counter(r[0] for r in conflicts)
     exc_rows = collections.defaultdict(list)
