@@ -17,3 +17,6 @@ output/
 # Python
 __pycache__/
 *.pyc
+
+# subagent-driven-development の作業台帳
+.superpowers/
