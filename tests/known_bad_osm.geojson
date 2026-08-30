@@ -204,6 +204,54 @@
     "_id": "T09",
     "_座標の出典": "原データ"
    }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.776,
+     35.686
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "都道府県コードが正しい病院",
+    "official_name": "都道府県コードが正しい病院",
+    "addr:full": "千代田区1-10",
+    "addr:country": "JP",
+    "addr:province": "東京都",
+    "addr:city": "千代田区",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T10",
+    "_座標の出典": "原データ"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.777,
+     35.687
+    ]
+   },
+   "properties": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "所在地の先頭だけ一致する病院",
+    "official_name": "所在地の先頭だけ一致する病院",
+    "addr:full": "東京都渋谷区1-11",
+    "addr:country": "JP",
+    "addr:province": "東京都",
+    "addr:city": "渋谷区",
+    "beds": "100",
+    "source": "出典",
+    "_id": "T11",
+    "_座標の出典": "原データ"
+   }
   }
  ]
 }

@@ -8,6 +8,7 @@
   * タグのキーと値が OSM に投入できる形か（空値、255文字、制御文字）
   * amenity と healthcare の値が OSM の語彙にあるか
   * name が空の地物が無いか
+  * addr:province が都道府県コードと一致するか
 
 終了コード: 欠陥が 1 件でもあれば 1、なければ 0。
 """
@@ -19,6 +20,8 @@ import json
 import os
 import re
 import sys
+
+from prefectures import PREF
 
 MAX_TAG_LENGTH = 255
 JP_LAT = (20.0, 46.0)
@@ -128,15 +131,15 @@ def main():
         if note and note[0].isdigit():
             add("addr_note_chiban", fid, f"note が数字で始まる: {note}")
 
-        # addr:province は元データの所在地の先頭と一致するはず。
-        # 食い違うのは町字の照合が別の都道府県へ流れた兆候になる。
-        # 都道府県コードとの突き合わせにすると47件の対応表が要るので、
-        # 同じ行にある addr:full の先頭を使う。
+        # addr:province は都道府県コードから prefectures.PREF で引ける県名と
+        # 一致するはず。食い違うのは町字の照合が別の都道府県へ流れた兆候になる。
+        # 都道府県コードはこのブランチで出力ファイル名の根拠にもなっており、
+        # PREF という単一の対応表が既にあるので、それをそのまま突き合わせに使う。
+        code = r.get("都道府県コード", "")
         prov = r.get("addr:province", "")
-        full = r.get("addr:full", "")
-        if prov and full and not full.startswith(prov):
+        if prov and code in PREF and PREF[code] != prov:
             add("addr_province_mismatch", fid,
-                f"addr:province が {prov} だが所在地は {full[:12]} で始まる")
+                f"addr:province が {prov} だが都道府県コードは {code}（{PREF[code]}）")
 
         w = r.get("website", "")
         if w and not RE_URL.match(w):

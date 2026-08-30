@@ -8,6 +8,20 @@
 固定しているのは次の2件。
   T01 正常な地物。検出されないのが正しい
   T02 GeoJSON の座標が [緯度, 経度] の順で、name も空
+
+  addr_province_mismatch を都道府県コードで突き合わせる検査に変えたことで、
+  T04 の都道府県コードが実際の所在地（福島県）と食い違っていたことが判明した。
+  T04 は addr_note_chiban 専用の題材で province の食い違いを狙ったものでは
+  ないため、コードを福島県のものに直した。
+
+  T10, T11 は addr_province_mismatch を都道府県コードで突き合わせる検査
+  （PREF[都道府県コード] と addr:province の比較）専用の組。
+  T10 は都道府県コードと addr:province が一致するが addr:full の先頭は
+  県名で始まらない。addr:full の先頭と比較していた旧ロジックなら誤検出する
+  組み合わせで、検出されないのが正しい（EXPECTED に入れない）。
+  T11 は都道府県コードが addr:province と食い違うが、addr:full は
+  addr:province と同じ文字列で始まる。旧ロジックでは見逃していた食い違いで、
+  検出されるのが正しい。
 """
 
 import csv
@@ -22,7 +36,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXPECTED = {("T02", "coord_order"), ("T02", "name_missing"),
             ("T03", "addr_hierarchy"), ("T04", "addr_note_chiban"),
             ("T05", "addr_province_mismatch"),
-            ("T06", "coord_cross_city"), ("T07", "coord_cross_city")}
+            ("T06", "coord_cross_city"), ("T07", "coord_cross_city"),
+            ("T11", "addr_province_mismatch")}
 
 
 def main():
