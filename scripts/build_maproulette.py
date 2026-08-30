@@ -5,8 +5,8 @@
   <業態>_osm.csv  結合済みのタグ
 
 出力 (output/maproulette/):
-  <業態>/<都道府県コード>_<都道府県名>.geojson  チャレンジ1つ分のタスク
-  index.csv                                   チャレンジの一覧と件数
+  <業態>/<都道府県コード>_<都道府県名>_<業態>.geojson  チャレンジ1つ分のタスク
+  index.csv                                         チャレンジの一覧と件数
 
 形式:
   line-by-line GeoJSON を使う。各行が RFC 7464 のレコードセパレータ（0x1E）で
@@ -84,8 +84,10 @@ def main():
         shutil.rmtree(out_sub, ignore_errors=True)
         os.makedirs(out_sub, exist_ok=True)
         for key in sorted(groups):
-            name = (f"{key}_{PREF.get(key, key)}_{sector}"
-                    if args.split == "pref" else sector)
+            # --split none では key は都道府県コードでなく "all" という
+            # 印なので PREF を引かない。pref のときだけ都道府県名が要る。
+            pref_name = PREF[key] if args.split == "pref" else key
+            name = f"{key}_{pref_name}_{sector}" if args.split == "pref" else sector
             path = os.path.join(out_sub, f"{name}.geojson")
             with open(path, "w", encoding="utf-8") as f:
                 for r in groups[key]:
@@ -108,7 +110,7 @@ def main():
                     }
                     f.write(RS + json.dumps(task, ensure_ascii=False) + "\n")
             geocoded = sum(1 for r in groups[key] if r["座標の出典"] == "ジオコーディング")
-            index.append([sector, SECTORS[sector], key, PREF.get(key, key),
+            index.append([sector, SECTORS[sector], key, pref_name,
                           len(groups[key]), geocoded,
                           os.path.relpath(path, args.out_dir),
                           os.path.getsize(path)])
