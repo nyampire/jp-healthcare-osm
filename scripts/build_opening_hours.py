@@ -15,11 +15,11 @@
   NN-1_..._facility_info_YYYYMMDD.csv    施設票（曜日フラグ・祝日フラグ・時刻）
   NN-2_..._speciality_hours_YYYYMMDD.csv 診療科・診療時間票（two_file のみ）
 
-出力 (output/、業態名を接頭辞に付ける):
-  <業態>_opening_hours.csv   施設単位の opening_hours と要確認フラグ
-  <業態>_excluded.csv        opening_hours から除外した区間の全件リスト（人手検証用）
-  <業態>_emergency.csv       救急科の診療時間（該当する業態のみ）
-  <業態>_conflicts.csv       施設票の曜日/祝日フラグと時刻が矛盾するケース
+出力 (業態名を接頭辞に付ける):
+  output/build/<業態>_opening_hours.csv    施設単位の opening_hours と要確認フラグ
+  output/reports/<業態>_excluded.csv       opening_hours から除外した区間の全件リスト（人手検証用）
+  output/reports/<業態>_emergency.csv      救急科の診療時間（該当する業態のみ）
+  output/reports/<業態>_conflicts.csv      施設票の曜日/祝日フラグと時刻が矛盾するケース
 
 処理方針:
   01-2 は 1施設につき「診療科 × 時間帯」の複数行を持つが、OSM の opening_hours は

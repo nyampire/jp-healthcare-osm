@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """各タグの生成結果を施設単位に結合し、OSM へ投入できる形にまとめる。
 
-入力 (output/):
+入力 (output/build/):
   <業態>_geocoded.csv       座標と住所（元の値と付与した値）
   <業態>_names.csv          name 系のタグ
   <業態>_opening_hours.csv  opening_hours
@@ -9,7 +9,7 @@
   NN-*_..._YYYYMMDD.csv     施設票（website、病床数など未加工の列）
   mapping/facility_tags.csv 業態から amenity と healthcare への対応
 
-出力 (output/):
+出力 (output/osm/<業態>/):
   <業態>_osm.csv      施設単位の全タグ。表計算ソフトで確認する用
   <業態>_osm.geojson  同じ内容の点データ。JOSM で開いて地図上で確認する用
 

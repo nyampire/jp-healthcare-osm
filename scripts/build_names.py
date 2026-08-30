@@ -8,7 +8,7 @@
   mapping/name_entity_prefixes.csv  運営主体の先頭パターン
   mapping/name_entity_suffixes.csv  法人名トークンの接尾辞
 
-出力 (output/):
+出力 (output/build/):
   <業態>_names.csv  元の列を保持したまま、OSM 用の名称列を追加したもの
 
 処理方針:

@@ -9,7 +9,7 @@
  *   - コメントを通常ルールとして書くと平日まで休診判定になる問題
  *
  * 使い方:
- *   node scripts/validate_opening_hours.js [output/opening_hours.csv]
+ *   node scripts/validate_opening_hours.js [output/build/<業態>_opening_hours.csv]
  *
  * 終了コード: 生成側の欠陥（パースエラー・5週間で一度も開かない・ゼロ長区間）が
  *             1 件でもあれば 1、なければ 0。参照実装の警告は 0 のまま扱う。

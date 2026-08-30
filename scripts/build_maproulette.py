@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OSM 向けデータを MapRoulette のタスクファイルに変換する。
 
-入力 (output/):
+入力 (output/osm/<業態>/):
   <業態>_osm.csv  結合済みのタグ
 
 出力 (output/maproulette/):

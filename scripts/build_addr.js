@@ -5,7 +5,7 @@
  * 入力:
  *   NN-*_..._YYYYMMDD.csv  施設票
  *
- * 出力 (output/):
+ * 出力 (output/build/):
  *   <業態>_geocoded.csv    全施設。元の値と付与した値を別列で持つ
  *
  *   住所から得た点は 住所_lat / 住所_lon / 住所_位置レベル に必ず残す。

@@ -194,12 +194,24 @@ vendor/
 元データの列は書き換えず、変換後の値は別列として持ちます。
 除外や保留をした行は理由とともに全件が一覧に残るので、第三者が対比して検証できます。
 
+`output/` は役割ごとに分かれています。
+
+| ディレクトリ | 中身 |
+| --- | --- |
+| `osm/<業態>/` | OSM 向けの成果物。全国1ファイルと、都道府県別のファイル |
+| `build/` | 途中経過。`build_osm.py` の入力 |
+| `reports/` | 検証結果と、除外・重複などの調査用ファイル |
+| `maproulette/` | MapRoulette 向けのタスク（`npm run maproulette` で作る） |
+
+都道府県別のファイルは `{コード}_{県名}_{業態}` の名前です。
+`osm/hospital/13_東京都_hospital.csv` のようになります。
+
 投入に使うのは次の2つです。
 
 | ファイル | 内容 |
 |---|---|
-| `<業態>_osm.geojson` | 結合済みの点データ。JOSM で開ける |
-| `<業態>_osm.csv` | 同じ内容の一覧。表計算ソフトで確認する用 |
+| `osm/<業態>/<業態>_osm.geojson` | 結合済みの点データ（全国）。JOSM で開ける |
+| `osm/<業態>/<業態>_osm.csv` | 同じ内容の一覧（全国）。表計算ソフトで確認する用 |
 
 MapRoulette を使う場合は `output/maproulette/` に別形式で出します。
 
@@ -214,14 +226,14 @@ npm run maproulette
 
 | ファイル | 内容 |
 |---|---|
-| `<業態>_geocoded.csv` | 座標と住所。元の値、付与した値、住所から得た点、出典、精度レベル |
-| `<業態>_names.csv` | 元の名称列と name 系タグ |
-| `<業態>_opening_hours.csv` | opening_hours と要確認フラグ、備考 |
-| `<業態>_speciality.csv` | healthcare:speciality と丸めた診療科の内訳 |
-| `<業態>_excluded.csv` | opening_hours から除外した区間の全件 |
-| `<業態>_conflicts.csv` | 曜日フラグと時刻が矛盾する行と、採用した判断 |
-| `<業態>_emergency.csv` | 救急科の診療時間（外来とは別枠） |
-| `*_validation.csv` | 検証で検出した項目 |
+| `build/<業態>_geocoded.csv` | 座標と住所。元の値、付与した値、住所から得た点、出典、精度レベル |
+| `build/<業態>_names.csv` | 元の名称列と name 系タグ |
+| `build/<業態>_opening_hours.csv` | opening_hours と要確認フラグ、備考 |
+| `build/<業態>_speciality.csv` | healthcare:speciality と丸めた診療科の内訳 |
+| `reports/<業態>_excluded.csv` | opening_hours から除外した区間の全件 |
+| `reports/<業態>_conflicts.csv` | 曜日フラグと時刻が矛盾する行と、採用した判断 |
+| `reports/<業態>_emergency.csv` | 救急科の診療時間（外来とは別枠） |
+| `reports/*_validation.csv` | 検証で検出した項目 |
 
 ## 現在の到達点
 

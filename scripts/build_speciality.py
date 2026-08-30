@@ -7,7 +7,7 @@
   NN-2_..._speciality_hours_YYYYMMDD.csv 診療科・診療時間票
   mapping/speciality_mapping.csv         診療科目コード → OSM 値の対応表
 
-出力 (output/):
+出力 (output/build/):
   <業態>_speciality.csv  施設単位の healthcare:speciality と、丸めた診療科の内訳
 
   同じコードが業態によって別の意味で使われることがあるため、対応表は業態別の

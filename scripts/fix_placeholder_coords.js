@@ -2,7 +2,7 @@
 /**
  * 元データの座標のうち、実在の位置ではなく穴埋めのものを捨てる。
  *
- * 入力・出力 (output/):
+ * 入力・出力 (output/build/):
  *   <業態>_geocoded.csv    その場で書き換える
  *
  * 元データは座標を持たない施設に、都道府県庁の代表点や丸めた値を入れている。
@@ -108,7 +108,7 @@ function main() {
     files.push({ sector, file, header, recs });
   }
   if (!files.length) {
-    console.error(`${outDir} に <業態>_geocoded.csv がありません`);
+    console.error(`${path.join(outDir, "build")} に <業態>_geocoded.csv がありません`);
     process.exit(2);
   }
   const missing = SECTORS.filter(

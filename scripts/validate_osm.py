@@ -35,7 +35,7 @@ RE_URL = re.compile(r"^https?://\S+$")
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("prefix", help="output/<業態>_osm の接頭辞、または CSV のパス")
+    p.add_argument("prefix", help="output/osm/<業態>/<業態>_osm の接頭辞、または CSV のパス")
     p.add_argument("--report-dir", default=None,
                    help="検証結果の出力先。既定は入力ファイルと同じディレクトリ")
     args = p.parse_args()
