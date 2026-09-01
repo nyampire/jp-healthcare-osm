@@ -61,6 +61,12 @@ def main():
     def add(kind, ident, detail):
         issues[kind].append((ident, detail))
 
+    # 残余の列が無ければ addr_note_chiban は何も見つけられない。
+    # 検査が黙って無効になるほうが、検出0件よりたちが悪いので欠陥にする。
+    if rows and "未解釈の文字列" not in rows[0]:
+        add("missing_column", "-",
+            "CSV に 未解釈の文字列 列が無く addr_note_chiban を検査できない")
+
     # GeoJSON の構造
     if gj.get("type") != "FeatureCollection":
         add("geojson_structure", "-", f"type が FeatureCollection でない: {gj.get('type')}")
@@ -95,9 +101,12 @@ def main():
                 break
 
     # CSV 側のタグ
+    # タグでない列。ここに足し忘れると、日本語の列名が bad_key として
+    # 検出され、非タグ列を増やすたびに検証が落ちる。
+    NON_TAG_COLUMNS = ("ID", "都道府県コード", "lat", "lon", "座標の出典",
+                       "要確認", "備考", "未解釈の文字列", "fixme の内容")
     tag_keys = [k for k in rows[0].keys()
-                if k not in ("ID", "都道府県コード", "lat", "lon", "座標の出典",
-                             "要確認", "備考")] if rows else []
+                if k not in NON_TAG_COLUMNS] if rows else []
     value_use = collections.Counter()
     for r in rows:
         fid = r["ID"]
@@ -128,11 +137,15 @@ def main():
         if r.get("addr:housenumber") and not r.get("addr:neighbourhood"):
             add("addr_hierarchy", fid, "addr:housenumber があるのに addr:neighbourhood が空")
 
-        # 住居表示未実施の町字では、NJA が解決できなかった地番が note に残る。
+        # 住居表示未実施の町字では、NJA が解決できなかった地番が残余に残る。
         # 値の出自は利用者の入力文字列だが、実質は地番なので投入前に確認する。
-        note = r.get("note", "")
-        if note and note[0].isdigit():
-            add("addr_note_chiban", fid, f"note が数字で始まる: {note}")
+        #
+        # 残余は 2026-09-01 に OSM タグ（note）から CSV 末尾の非タグ列へ移した。
+        # 参照先を追随させないと、この検査は何も見つけないまま通り続ける。
+        # 列が消えたら黙って素通りしないよう、下で欠落を検出する。
+        residue = r.get("未解釈の文字列", "")
+        if residue and residue[0].isdigit():
+            add("addr_note_chiban", fid, f"未解釈の文字列が数字で始まる: {residue}")
 
         # addr:province は都道府県コードから prefectures.PREF で引ける県名と
         # 一致するはず。食い違うのは町字の照合が別の都道府県へ流れた兆候になる。
@@ -238,7 +251,8 @@ def main():
     for k in ("geojson_structure", "count_mismatch", "id_mismatch", "coord_order",
               "coord_range", "name_missing", "type_missing", "unknown_value",
               "bad_website", "bad_key", "tag_too_long", "control_char", "untrimmed",
-              "addr_hierarchy", "addr_note_chiban", "addr_province_mismatch",
+              "missing_column", "addr_hierarchy", "addr_note_chiban",
+              "addr_province_mismatch",
               "coord_cross_city", "pref_split_row_mismatch", "pref_split_missing",
               "pref_split_extra"):
         items = issues.get(k, [])

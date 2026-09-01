@@ -98,6 +98,14 @@ def main():
                         props["_注意"] = "座標は住所から推定したもの。現地または航空写真で確認が必要"
                     if r.get("要確認"):
                         props["_要確認"] = r["備考"][:200]
+                    # 住所のうち解釈できなかった部分。OSM のタグには出さず
+                    # ここだけで作業者に見せる（上流 nja-osm-tags の Issue 5）。
+                    # 中身そのものより「入力のどこで解釈が止まったか」に
+                    # 価値があるので、addr:full と並べて読めるここに置く。
+                    if r.get("未解釈の文字列"):
+                        props["_未解釈の文字列"] = r["未解釈の文字列"][:200]
+                    if r.get("fixme の内容"):
+                        props["_fixme"] = r["fixme の内容"][:200]
                     task = {
                         "type": "FeatureCollection",
                         "features": [{

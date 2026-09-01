@@ -159,11 +159,14 @@ def write_osm_files(base, rows, features, keys):
     """
     with open(base + ".csv", "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
+        # 末尾4列はタグではない。keys がタグ列の全体で、その後ろは
+        # 作業者に渡す申し送りが並ぶ。GeoJSON 側には出さない。
         w.writerow(["ID", "都道府県コード", "lat", "lon", "座標の出典"] + keys
-                   + ["要確認", "備考"])
-        for fid, pref, la, lo, origin, tags, review, note in rows:
+                   + ["要確認", "備考", "未解釈の文字列", "fixme の内容"])
+        for fid, pref, la, lo, origin, tags, review, note, residue, fixme in rows:
             w.writerow([fid, pref, la, lo, origin]
-                       + [tags.get(k, "") for k in keys] + [review, note])
+                       + [tags.get(k, "") for k in keys]
+                       + [review, note, residue, fixme])
     with open(base + ".geojson", "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": features},
                   f, ensure_ascii=False)
@@ -339,8 +342,11 @@ def main():
             "addr:neighbourhood": g.get("addr:neighbourhood", ""),
             "addr:block_number": block_number,
             "addr:housenumber": housenumber,
-            "note": g.get("未解釈の文字列", ""),
-            "fixme": g.get("fixme", ""),
+            # note と fixme はタグにしない。上流 nja-osm-tags の Issue 5 で、
+            # 残余は OSM オブジェクトに載せず MapRoulette で作業者に見せる
+            # 方針に決めた。中身は入力住所から導ける（病院1,482件のうち
+            # 1,384件が正規化すれば元の住所の部分文字列）ため、タグとして
+            # 情報が増えていない。値は CSV の末尾列と MapRoulette に渡す。
             "beds": beds_tag,
             "source": SOURCE,
         }
@@ -349,7 +355,8 @@ def main():
         review = "yes" if (nm.get("要確認") or hr.get("要確認") or g.get("要確認")
                            or ft["確度"] == "broader") else ""
         rows.append((fid, g["都道府県コード"], la, lo, g["座標の出典"], tags, review,
-                     " / ".join(notes)))
+                     " / ".join(notes),
+                     g.get("未解釈の文字列", ""), g.get("fixme", "")))
         features.append({
             "type": "Feature",
             # GeoJSON は経度が先。緯度を先に置くと日本の施設が海上へ飛ぶ
@@ -363,7 +370,7 @@ def main():
             "healthcare:speciality", "website", "addr:full",
             "addr:country", "addr:province", "addr:county", "addr:city",
             "addr:suburb", "addr:quarter", "addr:neighbourhood",
-            "addr:block_number", "addr:housenumber", "note", "fixme",
+            "addr:block_number", "addr:housenumber",
             "beds", "source"]
     # 都道府県コードの検査は、全国・県別のどちらのファイルを書き出すよりも
     # 前に済ませる。後回しにすると、検査に落ちても全国ファイルだけは
@@ -384,7 +391,9 @@ def main():
     for k in sorted(stat):
         print(f"  {k:<24} {stat[k]:>8,}")
     filled = collections.Counter()
-    for _, _, _, _, _, tags, _, _ in rows:
+    # 添字で取る。位置で展開すると、行に列を足すたびにここが黙って落ちる。
+    for row in rows:
+        tags = row[5]
         for k in keys:
             if tags.get(k):
                 filled[k] += 1

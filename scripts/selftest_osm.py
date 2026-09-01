@@ -109,6 +109,39 @@ def main():
         if not ok:
             print(f"        期待: 0 / 実際: {r2.returncode}")
 
+        # 残余の列が消えたら検査が黙って無効になる経路を塞ぐ。
+        # 残余は 2026-09-01 に OSM タグ（note）から非タグ列へ移した。
+        # build_osm.py が列名を変えたり落としたりすると、addr_note_chiban は
+        # 何も検出しないまま通り続ける。検出0件と区別がつかないので、
+        # 列そのものの欠落を欠陥として拾えることを確かめる。
+        # 直前の only は終了コード0なので、列を1つ落とすだけで 0 → 1 に
+        # 変わることを見れば、検査が生きていることの証明になる。
+        noresidue = os.path.join(tmp, "no_residue")
+        with open(only + ".csv", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            cols = [c for c in reader.fieldnames if c != "未解釈の文字列"]
+            rows = [{k: x[k] for k in cols} for x in reader]
+        with open(noresidue + ".csv", "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            w.writerows(rows)
+        shutil.copy(only + ".geojson", noresidue + ".geojson")
+        r3 = subprocess.run(
+            [sys.executable, os.path.join(ROOT, "scripts", "validate_osm.py"),
+             noresidue],
+            capture_output=True, text=True)
+        kinds = set()
+        rep3 = noresidue + "_validation.csv"
+        if os.path.exists(rep3):
+            with open(rep3, encoding="utf-8-sig", newline="") as f:
+                kinds = {x["種別"] for x in csv.DictReader(f)}
+        ok = r3.returncode == 1 and "missing_column" in kinds
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  残余の列が消えたら検査できないと分かる")
+        if not ok:
+            print(f"        終了コード {r3.returncode} / 検出 {sorted(kinds)}")
+
         # 都道府県別ファイルとの検算（I-2）。県別ファイルが無いときに何も
         # 検出しないことは上のブロックまでの実行（bad_osm と同じ tmp に
         # 県別ファイルを一切置いていない）で既に確かめている。ここでは
@@ -169,7 +202,10 @@ def main():
         print(f"  {'PASS' if ok else 'FAIL'}  全国データに無い都道府県コードのファイルを検出する")
         os.remove(os.path.join(tmp, f"{extra_code}_pref{extra_code}_bad.csv"))
 
-        total = len(EXPECTED) + 3 + 4
+        # EXPECTED の各件 + 単独の検査4件（余分な検出が無い / 不正データで1 /
+        # addr_note_chiban だけなら0 / 残余の列が消えたら分かる）+ 県別分割4件。
+        # ここを足し忘れると PASS の行数と集計がずれる。
+        total = len(EXPECTED) + 4 + 4
         print(f"\n  {total - failed}/{total} 件")
         return 1 if failed else 0
     finally:
