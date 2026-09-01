@@ -61,6 +61,12 @@ PDL1.0 は「編集・加工した情報を、あたかも国又は府省等が�
 [docs/geocoding-investigation.md](docs/geocoding-investigation.md) にあります。
 結論は出ておらず、未解決の問いと再現手順を残した引き継ぎ用の記録です。
 
+出力した座標が実際にその施設を指しているかの検算は
+[docs/coord-verification.md](docs/coord-verification.md) にあります。
+3つの方法の実測値と、それぞれが届かない範囲を書いています。
+検算は `npm run verify:coords:addr` と `npm run verify:coords:osm` で実行します。
+前者は外部への通信がなく、後者は日本全体の `.osm.pbf` と `osmium` が要ります。
+
 診療科目コードと `healthcare:speciality` の対応は
 [docs/speciality-mapping.md](docs/speciality-mapping.md) に一覧があります。
 127コードすべてと、どの診療科がどの値に集まるかの逆引きを載せています。
