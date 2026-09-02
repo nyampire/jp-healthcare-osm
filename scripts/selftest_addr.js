@@ -11,6 +11,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { foldColumns, recheckAddress, adoptRecheck } = require("./addr_columns.js");
+const { loadPrefBox, outOfPref, inBox, MARGIN_DEGREES } = require("./pref_bbox.js");
 
 const ROOT = path.dirname(__dirname);
 const FIXTURE = path.join(ROOT, "tests", "known_bad_addr.csv");
@@ -72,6 +73,7 @@ function main() {
 
   checkRecheck();
   checkStartupGuard();
+  checkOutOfPref();
 }
 
 /**
@@ -181,6 +183,78 @@ function checkRecheck() {
     console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
     if (!ok && actual) console.log(`        実際: ${actual}`);
   }
+  if (failed) process.exit(1);
+}
+
+/**
+ * 県外を指す座標の判定を検査する。
+ *
+ * 距離では判定できない。海上自衛隊硫黄島航空基地医務室は正しい座標のまま
+ * 住所点から270.6km離れる。県外かどうかで見ると、硫黄島の座標は東京都の
+ * 矩形の中にあり、誤りの6件は別の県の矩形の中にある。
+ */
+function checkOutOfPref() {
+  console.log("");
+  const cases = [];
+
+  // 実データから採った値を丸めたもの。東京都は南鳥島と沖ノ鳥島を含む。
+  const box = {
+    "熊本県": { code: "43", latMin: 32.1143, latMax: 33.1672, lonMin: 129.9929, lonMax: 131.2894 },
+    "愛知県": { code: "23", latMin: 34.5776, latMax: 35.4245, lonMin: 136.6725, lonMax: 137.8395 },
+    "東京都": { code: "13", latMin: 20.4256, latMax: 35.8580, lonMin: 136.0811, lonMax: 153.9806 },
+  };
+
+  cases.push(["自県の矩形の外かつ他県の矩形の中なら県名を返す",
+    JSON.stringify(outOfPref(box, "熊本県", 35.085644, 137.190795)) === '["愛知県","東京都"]',
+    JSON.stringify(outOfPref(box, "熊本県", 35.085644, 137.190795))]);
+
+  cases.push(["自県の矩形の中なら null を返す",
+    outOfPref(box, "熊本県", 32.95, 131.10) === null, ""]);
+
+  // 硫黄島の実際の座標。東京都の矩形の中にあるので差し替えの対象にしない。
+  cases.push(["硫黄島の座標は東京都の矩形の中にある",
+    outOfPref(box, "東京都", 24.79439, 141.306414) === null, ""]);
+
+  cases.push(["どの県の矩形にも入らなければ null を返す",
+    outOfPref(box, "熊本県", 45.0, 141.0) === null, ""]);
+
+  cases.push(["表に無い県名なら null を返す",
+    outOfPref(box, "沖縄県", 35.085644, 137.190795) === null, ""]);
+
+  cases.push(["県名が空なら null を返す",
+    outOfPref(box, "", 35.085644, 137.190795) === null, ""]);
+
+  // 矩形の縁の外側でも余裕の内側なら自県とみなす。埋立地や岬を吸収する。
+  cases.push(["余裕の内側は自県の矩形の中とみなす",
+    outOfPref(box, "熊本県", 33.1672 + 0.03, 130.5) === null, ""]);
+
+  cases.push(["余裕の外側は自県の矩形の外とみなす",
+    inBox(box["熊本県"], 33.1672 + 0.07, 130.5, MARGIN_DEGREES) === false, ""]);
+
+  // 表の読み込み。区切りだけの単純な CSV で、BOM を落とすことを確かめる。
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "osm-iryo-bbox-"));
+  const file = path.join(dir, "pref_bbox.csv");
+  fs.writeFileSync(file,
+    "﻿都道府県コード,都道府県,lat_min,lat_max,lon_min,lon_max\n"
+    + "13,東京都,20.425600,35.858000,136.081100,153.980600\n"
+    + "43,熊本県,32.114300,33.167200,129.992900,131.289400\n");
+  const loaded = loadPrefBox(file);
+  cases.push(["表を読むと県名で引ける", Object.keys(loaded).length === 2, String(Object.keys(loaded).length)]);
+  cases.push(["BOM を落として県名を読む", loaded["東京都"] !== undefined, Object.keys(loaded).join(",")]);
+  cases.push(["矩形の値を数値で持つ",
+    loaded["熊本県"].latMin === 32.1143 && loaded["熊本県"].lonMax === 131.2894,
+    String(loaded["熊本県"] && loaded["熊本県"].latMin)]);
+  cases.push(["都道府県コードを文字列で持つ",
+    loaded["熊本県"].code === "43", String(loaded["熊本県"] && loaded["熊本県"].code)]);
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  let failed = 0;
+  for (const [name, ok, actual] of cases) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
+    if (!ok && actual) console.log(`        実際: ${actual}`);
+  }
+  console.log(`\n  ${cases.length - failed}/${cases.length} 件`);
   if (failed) process.exit(1);
 }
 
