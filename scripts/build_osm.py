@@ -134,6 +134,20 @@ def clean_url(value):
     return "", f"website に使えない形式のため出力しない: {v[:60]}"
 
 
+def join_notes(specific, common):
+    """備考の1文を並べて1つの文字列にする。
+
+    行ごとに違う文を先に、全行に同じ文字列で付く定型文を最後に置く。
+    build_maproulette.py が _要確認 を200文字で切るため、並び順がそのまま
+    「切られたときに何が残るか」を決める。施設種別の推定を告げる定型文は
+    72,962行すべてに同じ85文字で付き、その行については何も語らない。
+    これが先頭にあると、行ごとに違う文が200文字の外へ押し出される。
+
+    OSM の CSV の 備考 には両方とも出る。落ちるのは MapRoulette 側だけ。
+    """
+    return " / ".join([*specific, *common])
+
+
 def coord_note(g):
     """ジオコーディングで座標を付けた行の 備考 に積む1文を返す。
 
@@ -289,6 +303,7 @@ def main():
         sp = spec.get(fid, {})
         row = raw.get(fid, [])
         notes = []
+        common = []
 
         # 施設種別。診療所だけ病床数で分ける
         cond = ""
@@ -299,7 +314,8 @@ def main():
         if ft is None:
             sys.exit(f"施設種別の対応が見つかりません: {args.sector} / {cond}")
         if ft["確度"] == "broader":
-            notes.append(f"施設種別を推定: {ft['備考']}")
+            # 全行に同じ文字列で付く定型文。備考の最後に回す。
+            common.append(f"施設種別を推定: {ft['備考']}")
             stat["施設種別が推定"] += 1
 
         website = ""
@@ -374,7 +390,7 @@ def main():
         review = "yes" if (nm.get("要確認") or hr.get("要確認") or g.get("要確認")
                            or ft["確度"] == "broader") else ""
         rows.append((fid, g["都道府県コード"], la, lo, g["座標の出典"], tags, review,
-                     " / ".join(notes),
+                     join_notes(notes, common),
                      g.get("未解釈の文字列", ""), g.get("fixme", "")))
         features.append({
             "type": "Feature",

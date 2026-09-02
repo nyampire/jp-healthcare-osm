@@ -49,6 +49,31 @@ TAG_KEYS = ["amenity", "healthcare", "name", "official_name", "short_name",
             "healthcare:speciality", "website", "addr:full", "beds", "source"]
 
 
+def clip_notes(text, limit=200):
+    """備考を limit 文字以内に収める。" / " の境界で切る。
+
+    文の途中で切ると、座標の数値が「元データの座標 33.5」のように途中で
+    終わり、作業者には妥当な座標に見える。情報が消えるより悪い切れ方なので、
+    文を丸ごと落とす形にする。
+
+    落ちるのは後ろの文から。build_osm.py の join_notes が、行ごとに違う文を
+    先に、全行に同じ文字列で付く定型文を最後に置いている。
+
+    先頭の1文だけで limit を超えるときは文字数で切るしかない。
+    実データでは1文の最長が105文字なので、いまは起きない。
+    """
+    if len(text) <= limit:
+        return text
+    kept, used = [], 0
+    for note in text.split(" / "):
+        add = len(note) + (3 if kept else 0)
+        if used + add > limit:
+            break
+        kept.append(note)
+        used += add
+    return " / ".join(kept) if kept else text[:limit]
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--out-dir", default="output")
@@ -97,7 +122,7 @@ def main():
                     if r["座標の出典"] == "ジオコーディング":
                         props["_注意"] = "座標は住所から推定したもの。現地または航空写真で確認が必要"
                     if r.get("要確認"):
-                        props["_要確認"] = r["備考"][:200]
+                        props["_要確認"] = clip_notes(r["備考"])
                     # 住所のうち解釈できなかった部分。OSM のタグには出さず
                     # ここだけで作業者に見せる（上流 nja-osm-tags の Issue 5）。
                     # 中身そのものより「入力のどこで解釈が止まったか」に

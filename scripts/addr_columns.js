@@ -155,6 +155,19 @@ function usable(v) {
 }
 
 /**
+ * 捨てた元データの座標を指す文の頭。
+ *
+ * 値は正規化せず元データの文字列のまま出す。作業者が元のファイルと
+ * 突き合わせられるようにするため。31, 131 のような穴埋めの値は、
+ * 値そのものを見せれば理由の説明より早く伝わる。
+ *
+ * 1km規則、県外の規則、穴埋めの規則の3箇所から呼ぶ。
+ */
+function discardedCoordText(lat, lon) {
+  return `元データの座標 ${String(lat).trim()}, ${String(lon).trim()}`;
+}
+
+/**
  * 元データの座標を捨てて住所点を採る。
  *
  * 1km規則と県外の規則で共通の処理。理由の文だけが違うので引数で受ける。
@@ -222,7 +235,7 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
 
     if (drift !== null && drift > maxDrift) {
       return adoptAddressPoint(out, nja, level, notes,
-        `元データの座標 ${String(rawLat).trim()}, ${String(rawLon).trim()} が`
+        `${discardedCoordText(rawLat, rawLon)} が`
         + `ジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`);
     }
 
@@ -241,7 +254,7 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
 
     if (others) {
       return adoptAddressPoint(out, nja, level, notes,
-        `元データの座標 ${String(rawLat).trim()}, ${String(rawLon).trim()} が`
+        `${discardedCoordText(rawLat, rawLon)} が`
         + `${nja["addr:province"]}ではなく${others.join("と")}の範囲にあるため、ジオコーダ座標を採用`);
     }
 
@@ -265,6 +278,6 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
 
 module.exports = {
   foldColumns, resolveFromAddress, recheckAddress, adoptRecheck,
-  distanceMeters, usable,
+  distanceMeters, usable, discardedCoordText,
   ADDR_KEYS, POINT_LEVEL_NOTE, MAX_DRIFT_METERS,
 };

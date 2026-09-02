@@ -18,7 +18,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_osm import coord_note  # noqa: E402
+from build_osm import coord_note, join_notes  # noqa: E402
 
 
 def main():
@@ -33,6 +33,27 @@ def main():
         ("座標の理由の列が無くても定型文を返す",
          coord_note({"位置レベル": "3"}),
          "座標は住所から付与（位置レベル3）"),
+    ]
+
+    # 備考の並び順。build_maproulette.py が _要確認 を200文字で切るので、
+    # 並び順がそのまま「切られたときに何が残るか」を決める。
+    # 施設種別の定型文は72,962行すべてに同じ85文字で付き、その行について
+    # 何も語らない。これが先頭にあると、行ごとに違う文が押し出される。
+    boiler = ("施設種別を推定: 暫定値。病床数が空欄の31399件を無床とみなしている。"
+              "空欄は未記入であって無床の証拠ではない。一律clinicにする案もあり、"
+              "コミュニティでの合意待ち")
+    hours = ("255文字を超えたため末尾の規則1件を落とした: "
+             "Jun 04,Jun 11,Jun 18,Jun 25,Jul 02,Jul 09,Jul 16,Jul 23,Jul 30,Aug 06,Aug 12-Aug")
+    worst = join_notes([reason, hours], [boiler])
+    cases += [
+        ("定型文を最後に置く",
+         join_notes(["行に固有"], ["定型"]), "行に固有 / 定型"),
+        ("行に固有の文が無ければ定型文だけを返す",
+         join_notes([], ["定型"]), "定型"),
+        ("定型文が無ければ行に固有の文だけを返す",
+         join_notes(["行に固有"], []), "行に固有"),
+        ("最悪の組み合わせでも理由が先頭200文字に丸ごと残る",
+         reason in worst[:200], True),
     ]
 
     failed = 0
