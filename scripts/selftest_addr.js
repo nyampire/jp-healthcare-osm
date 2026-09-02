@@ -335,6 +335,22 @@ function checkOutOfPref() {
   cases.push(["住所点が無ければ差し替えない",
     noPoint["座標の出典"] === "原データ", noPoint["座標の出典"]]);
 
+  // 座標の理由は build_osm.py が読む列。備考の先頭の1文と同じ内容を、
+  // 他の文と混ざらない形で持つ。build_osm.py は備考を定型文に置き換えるので、
+  // 捨てた座標を MapRoulette まで運ぶにはこの列が要る。
+  const why = (rec) => (typeof rec["座標の理由"] === "string"
+    ? rec["座標の理由"] : "(座標の理由の列が無い)");
+  cases.push(["県外の規則が座標の理由に捨てた座標を書く",
+    why(moved).includes("元データの座標 35.085644, 137.190795 が")
+    && why(moved).includes("の範囲にあるため"), why(moved)]);
+  cases.push(["座標の理由が備考の先頭の1文と一致する",
+    why(moved) === moved["備考"].split(" / ")[0], why(moved)]);
+  cases.push(["1km規則も座標の理由を書く",
+    why(lv8).includes("元データの座標 35.085644, 137.190795 が")
+    && why(lv8).includes("離れているため"), why(lv8)]);
+  cases.push(["原データを採った行の座標の理由は空",
+    why(kept) === "", why(kept)]);
+
   let failed = 0;
   for (const [name, ok, actual] of cases) {
     if (!ok) failed++;

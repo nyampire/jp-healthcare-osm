@@ -159,6 +159,10 @@ function usable(v) {
  *
  * 1km規則と県外の規則で共通の処理。理由の文だけが違うので引数で受ける。
  * 呼び出し側は out をそのまま返す。
+ *
+ * 理由は 備考 と 座標の理由 の両方に入れる。備考は他の文と " / " で
+ * つながるが、build_osm.py はジオコーディングの行の備考を作り直すので、
+ * 理由だけを単独で取り出せる列が要る。
  */
 function adoptAddressPoint(out, nja, level, notes, reason) {
   out.lat = nja["_lat"];
@@ -167,6 +171,7 @@ function adoptAddressPoint(out, nja, level, notes, reason) {
   out["位置レベル"] = String(level);
   out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
   out["要確認"] = "yes";
+  out["座標の理由"] = reason;
   notes.push(reason);
   if (out["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${out["未解釈の文字列"]}`);
   out["備考"] = notes.join(" / ");
@@ -191,6 +196,8 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
     "未解釈の文字列": nja["note"] || "",
     "fixme": nja["fixme"] || "",
     "要確認": "", "備考": "",
+    // 元データの座標を捨てた行だけが値を持つ。build_osm.py が読む。
+    "座標の理由": "",
   };
   const notes = [];
 
