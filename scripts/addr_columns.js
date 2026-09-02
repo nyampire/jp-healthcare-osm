@@ -231,8 +231,8 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
     // 硫黄島の医務室は正しい座標のまま270.6km離れる。
     //
     // 位置レベル2は市区町村の代表点なので対象にしない。県境の稜線に建つ
-    // 山岳診療所を市街地へ動かす。レベル2まで広げると差し替えが6件から
-    // 11件に増え、増える5件は全てレベル2だった。
+    // 山岳診療所を市街地へ動かす。レベル2まで広げると差し替えが7件から
+    // 12件に増え、増える5件は全てレベル2だった。
     const others = level !== null && level >= 3
       && usable(nja["_lat"]) && usable(nja["_lng"])
       ? outOfPref(prefBox, nja["addr:province"] || "",
