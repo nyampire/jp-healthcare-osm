@@ -309,6 +309,8 @@ function checkOutOfPref() {
     moved["位置レベル"] === "3", moved["位置レベル"]]);
   cases.push(["備考に元の県と落ちた先の県が入る",
     moved["備考"].includes("熊本県ではなく愛知県と東京都の範囲"), moved["備考"]]);
+  cases.push(["備考に捨てた座標が入る",
+    moved["備考"].includes("元データの座標 35.085644, 137.190795 が"), moved["備考"]]);
 
   const kept = fold(nja, "32.950000", "131.100000");
   cases.push(["自県の座標は差し替えない", kept["座標の出典"] === "原データ", kept["座標の出典"]]);
@@ -322,6 +324,8 @@ function checkOutOfPref() {
     "35.085644", "137.190795");
   cases.push(["レベル8は1km規則が先に働き、同じ住所点を採る",
     lv8.lat === "32.950000" && lv8["備考"].includes("離れているため"), lv8["備考"]]);
+  cases.push(["1km規則の備考にも捨てた座標が入る",
+    lv8["備考"].includes("元データの座標 35.085644, 137.190795 が"), lv8["備考"]]);
 
   const noProv = fold({ ...nja, "addr:province": "" }, "35.085644", "137.190795");
   cases.push(["県名が空なら差し替えない",

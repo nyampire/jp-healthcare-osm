@@ -215,7 +215,8 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
 
     if (drift !== null && drift > maxDrift) {
       return adoptAddressPoint(out, nja, level, notes,
-        `元データの座標がジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`);
+        `元データの座標 ${String(rawLat).trim()}, ${String(rawLon).trim()} が`
+        + `ジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`);
     }
 
     // 元データの座標が住所の県ではなく他県の矩形の中にあるなら、住所点を採る。
@@ -233,7 +234,8 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
 
     if (others) {
       return adoptAddressPoint(out, nja, level, notes,
-        `元データの座標が${nja["addr:province"]}ではなく${others.join("と")}の範囲にあるため、ジオコーダ座標を採用`);
+        `元データの座標 ${String(rawLat).trim()}, ${String(rawLon).trim()} が`
+        + `${nja["addr:province"]}ではなく${others.join("と")}の範囲にあるため、ジオコーダ座標を採用`);
     }
 
     out.lat = String(rawLat).trim();
