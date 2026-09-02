@@ -27,6 +27,7 @@
     "validate:pharmacy": "node scripts/validate_opening_hours.js output/build/pharmacy_opening_hours.csv --report-dir output/reports && python3 scripts/validate_names.py output/build/pharmacy_names.csv --report-dir output/reports && python3 scripts/validate_osm.py output/osm/pharmacy/pharmacy_osm --report-dir output/reports",
     "build": "npm run prep:hospital && npm run prep:clinic && npm run prep:dental && npm run prep:maternity && npm run prep:pharmacy && npm run fix:coords && npm run osm:hospital && npm run osm:clinic && npm run osm:dental && npm run osm:maternity && npm run osm:pharmacy",
     "maproulette": "python3 scripts/build_maproulette.py",
+    "build:pref-bbox": "node scripts/build_pref_bbox.js",
     "validate": "npm run validate:hospital && npm run validate:clinic && npm run validate:dental && npm run validate:maternity && npm run validate:pharmacy",
     "docs": "python3 scripts/build_speciality_doc.py",
     "selftest": "node scripts/selftest.js && node scripts/selftest_addr.js && node scripts/selftest_placeholder.js && python3 scripts/selftest_osm.py && python3 scripts/selftest_split.py && python3 scripts/selftest_verify_coords.py",

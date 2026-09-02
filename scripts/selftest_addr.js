@@ -74,6 +74,48 @@ function main() {
   checkRecheck();
   checkStartupGuard();
   checkOutOfPref();
+  checkPrefBoxTable();
+}
+
+/**
+ * mapping/pref_bbox.csv そのものを検査する。
+ *
+ * 表が欠けたり縮んだりすると、正しい座標を県外と誤判定して動かす。
+ * 生成し直したときに気づけるよう、行数と範囲を固定する。
+ */
+function checkPrefBoxTable() {
+  console.log("");
+  const box = loadPrefBox();
+  const names = Object.keys(box);
+  const codes = names.map((n) => box[n].code).sort();
+  const want = Array.from({ length: 47 }, (_, i) => String(i + 1).padStart(2, "0"));
+
+  const cases = [
+    ["47都道府県が揃っている", names.length === 47, String(names.length)],
+    ["コードが01から47まで重複なく並ぶ", codes.join(",") === want.join(","), codes.join(",")],
+    ["矩形の上下と左右が逆転していない",
+      names.every((n) => box[n].latMin < box[n].latMax && box[n].lonMin < box[n].lonMax), ""],
+    ["矩形が日本の範囲に収まる",
+      names.every((n) => box[n].latMin >= 20 && box[n].latMax <= 46
+        && box[n].lonMin >= 122 && box[n].lonMax <= 154), ""],
+    // 東京都の矩形は南鳥島と沖ノ鳥島を含むので、硫黄島の座標を含む。
+    ["硫黄島の座標が東京都の矩形の中にある",
+      inBox(box["東京都"], 24.79439, 141.306414), ""],
+    // 誤りの例。熊本県の施設の座標が愛知県の矩形の中にある。
+    ["熊本県の矩形は愛知県の座標を含まない",
+      inBox(box["熊本県"], 35.085644, 137.190795) === false, ""],
+    ["愛知県の矩形は愛知県の座標を含む",
+      inBox(box["愛知県"], 35.085644, 137.190795), ""],
+  ];
+
+  let failed = 0;
+  for (const [name, ok, actual] of cases) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
+    if (!ok && actual) console.log(`        実際: ${actual}`);
+  }
+  console.log(`\n  ${cases.length - failed}/${cases.length} 件`);
+  if (failed) process.exit(1);
 }
 
 /**

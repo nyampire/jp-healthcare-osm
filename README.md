@@ -174,6 +174,7 @@ scripts/
   fix_placeholder_coords.js  元データが穴埋めに入れた座標を捨てる
   build_osm.py               各タグを結合し CSV と GeoJSON を出す
   build_maproulette.py       MapRoulette のタスクファイルを出す
+  build_pref_bbox.js         都道府県の外接矩形の表を nja から生成する
   build_speciality_doc.py    対応表から docs/speciality-mapping.md を生成する
   validate_opening_hours.js  OSM の参照実装 opening_hours.js で全件検証する
   validate_speciality.py     語彙、書式、タグ値長を検証する
@@ -190,6 +191,7 @@ mapping/
   name_entity_prefixes.csv   法人格と運営主体の先頭パターン
   name_entity_suffixes.csv   法人名トークンの接尾辞
   name_facility_words.csv    施設種別語
+  pref_bbox.csv              都道府県の外接矩形。県外を指す座標の判定に使う
 tests/
   known_bad.csv              opening_hours 検証器の逆テスト用フィクスチャ
   known_bad_osm.csv          OSM 出力検証器の逆テスト用フィクスチャ
