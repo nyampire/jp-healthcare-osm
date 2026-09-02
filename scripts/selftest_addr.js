@@ -290,6 +290,47 @@ function checkOutOfPref() {
     loaded["熊本県"].code === "43", String(loaded["熊本県"] && loaded["熊本県"].code)]);
   fs.rmSync(dir, { recursive: true, force: true });
 
+  // foldColumns を通したときの出力。差し替えた行が何を持つかを固定する。
+  const nja = {
+    "addr:country": "JP", "addr:province": "熊本県", "addr:county": "",
+    "addr:city": "阿蘇市", "addr:suburb": "内牧", "addr:quarter": "",
+    "addr:neighbourhood": "", "addr:block_number": "", "addr:housenumber": "",
+    "_lat": "32.950000", "_lng": "131.100000", "_座標精度": "3",
+    "_番地の根拠": "推定", "note": "", "fixme": "",
+  };
+  const fold = (rec, la, lo) => foldColumns(rec, la, lo, 8, 1000, box);
+
+  const moved = fold(nja, "35.085644", "137.190795");
+  cases.push(["県外の座標を住所点に差し替える", moved.lat === "32.950000", moved.lat]);
+  cases.push(["差し替えた行の出典はジオコーディング",
+    moved["座標の出典"] === "ジオコーディング", moved["座標の出典"]]);
+  cases.push(["差し替えた行に要確認が立つ", moved["要確認"] === "yes", moved["要確認"]]);
+  cases.push(["差し替えた行の位置レベルは住所点のもの",
+    moved["位置レベル"] === "3", moved["位置レベル"]]);
+  cases.push(["備考に元の県と落ちた先の県が入る",
+    moved["備考"].includes("熊本県ではなく愛知県と東京都の範囲"), moved["備考"]]);
+
+  const kept = fold(nja, "32.950000", "131.100000");
+  cases.push(["自県の座標は差し替えない", kept["座標の出典"] === "原データ", kept["座標の出典"]]);
+
+  // レベル2は市区町村の代表点。県境の稜線に建つ山岳診療所を市街地へ動かすので
+  // 対象にしない。鹿島槍冷池山荘診療所（富山県の住所、座標は長野県側）が実例。
+  const lv2 = fold({ ...nja, "_座標精度": "2" }, "35.085644", "137.190795");
+  cases.push(["位置レベル2は差し替えない", lv2["座標の出典"] === "原データ", lv2["座標の出典"]]);
+
+  const lv8 = fold({ ...nja, "_座標精度": "8", "_番地の根拠": "照合済み" },
+    "35.085644", "137.190795");
+  cases.push(["レベル8は1km規則が先に働き、同じ住所点を採る",
+    lv8.lat === "32.950000" && lv8["備考"].includes("離れているため"), lv8["備考"]]);
+
+  const noProv = fold({ ...nja, "addr:province": "" }, "35.085644", "137.190795");
+  cases.push(["県名が空なら差し替えない",
+    noProv["座標の出典"] === "原データ", noProv["座標の出典"]]);
+
+  const noPoint = fold({ ...nja, "_lat": "", "_lng": "" }, "35.085644", "137.190795");
+  cases.push(["住所点が無ければ差し替えない",
+    noPoint["座標の出典"] === "原データ", noPoint["座標の出典"]]);
+
   let failed = 0;
   for (const [name, ok, actual] of cases) {
     if (!ok) failed++;

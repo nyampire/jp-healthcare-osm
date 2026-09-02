@@ -1,3 +1,5 @@
+const { loadPrefBox, outOfPref } = require("./pref_bbox.js");
+
 /**
  * 推定になった行を照合し直すための住所を組む。
  *
@@ -153,13 +155,33 @@ function usable(v) {
 }
 
 /**
+ * 元データの座標を捨てて住所点を採る。
+ *
+ * 1km規則と県外の規則で共通の処理。理由の文だけが違うので引数で受ける。
+ * 呼び出し側は out をそのまま返す。
+ */
+function adoptAddressPoint(out, nja, level, notes, reason) {
+  out.lat = nja["_lat"];
+  out.lon = nja["_lng"];
+  out["座標の出典"] = "ジオコーディング";
+  out["位置レベル"] = String(level);
+  out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
+  out["要確認"] = "yes";
+  notes.push(reason);
+  if (out["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${out["未解釈の文字列"]}`);
+  out["備考"] = notes.join(" / ");
+  return out;
+}
+
+/**
  * 1行を出力列に畳む。
  *
  * 元データの緯度と経度が両方とも有効なら、それを採る。
  * 片方でも欠ければ NJA の点に回す。片方だけ採ると、欠けたほうが 0 のまま
  * 残って赤道上の座標になる。
  */
-function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METERS) {
+function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METERS,
+  prefBox = loadPrefBox()) {
   const out = {
     lat: "", lon: "",
     "座標の出典": "", "位置レベル": "", "位置レベルの意味": "",
@@ -192,16 +214,26 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
       : null;
 
     if (drift !== null && drift > maxDrift) {
-      out.lat = nja["_lat"];
-      out.lon = nja["_lng"];
-      out["座標の出典"] = "ジオコーディング";
-      out["位置レベル"] = String(level);
-      out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
-      out["要確認"] = "yes";
-      notes.push(`元データの座標がジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`);
-      if (out["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${out["未解釈の文字列"]}`);
-      out["備考"] = notes.join(" / ");
-      return out;
+      return adoptAddressPoint(out, nja, level, notes,
+        `元データの座標がジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`);
+    }
+
+    // 元データの座標が住所の県ではなく他県の矩形の中にあるなら、住所点を採る。
+    // 住所点からの距離では判定できない。小笠原村の住所点は父島にあるため、
+    // 硫黄島の医務室は正しい座標のまま270.6km離れる。
+    //
+    // 位置レベル2は市区町村の代表点なので対象にしない。県境の稜線に建つ
+    // 山岳診療所を市街地へ動かす。レベル2まで広げると差し替えが6件から
+    // 11件に増え、増える5件は全てレベル2だった。
+    const others = level !== null && level >= 3
+      && usable(nja["_lat"]) && usable(nja["_lng"])
+      ? outOfPref(prefBox, nja["addr:province"] || "",
+        parseFloat(rawLat), parseFloat(rawLon))
+      : null;
+
+    if (others) {
+      return adoptAddressPoint(out, nja, level, notes,
+        `元データの座標が${nja["addr:province"]}ではなく${others.join("と")}の範囲にあるため、ジオコーダ座標を採用`);
     }
 
     out.lat = String(rawLat).trim();
