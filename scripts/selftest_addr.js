@@ -301,7 +301,12 @@ function checkOutOfPref() {
   const fold = (rec, la, lo) => foldColumns(rec, la, lo, 8, 1000, box);
 
   const moved = fold(nja, "35.085644", "137.190795");
-  cases.push(["県外の座標を住所点に差し替える", moved.lat === "32.950000", moved.lat]);
+  // 緯度と経度の両方を見る。このリポジトリは「GeoJSON は経度が先。緯度を先に
+  // 置くと日本の施設が海上へ飛ぶ」を警戒しているので、片方だけの検査だと
+  // 経度が落ちる壊れ方や、緯度と経度が入れ替わる壊れ方をすり抜ける。
+  cases.push(["県外の座標を住所点に差し替える",
+    moved.lat === "32.950000" && moved.lon === "131.100000",
+    `${moved.lat}, ${moved.lon}`]);
   cases.push(["差し替えた行の出典はジオコーディング",
     moved["座標の出典"] === "ジオコーディング", moved["座標の出典"]]);
   cases.push(["差し替えた行に要確認が立つ", moved["要確認"] === "yes", moved["要確認"]]);
