@@ -30,7 +30,7 @@
     "build:pref-bbox": "node scripts/build_pref_bbox.js",
     "validate": "npm run validate:hospital && npm run validate:clinic && npm run validate:dental && npm run validate:maternity && npm run validate:pharmacy",
     "docs": "python3 scripts/build_speciality_doc.py",
-    "selftest": "node scripts/selftest.js && node scripts/selftest_addr.js && node scripts/selftest_placeholder.js && python3 scripts/selftest_osm.py && python3 scripts/selftest_build_osm.py && python3 scripts/selftest_maproulette.py && python3 scripts/selftest_split.py && python3 scripts/selftest_verify_coords.py",
+    "selftest": "node scripts/selftest.js && node scripts/selftest_addr.js && node scripts/selftest_placeholder.js && python3 scripts/selftest_osm.py && python3 scripts/selftest_build_osm.py && python3 scripts/selftest_maproulette.py && python3 scripts/selftest_pref_bbox.py && python3 scripts/selftest_split.py && python3 scripts/selftest_verify_coords.py",
     "verify:coords:addr": "python3 scripts/verify_coords_addr.py",
     "verify:coords:osm": "python3 scripts/verify_coords_osm.py",
     "all": "npm run build && npm run selftest && npm run validate"

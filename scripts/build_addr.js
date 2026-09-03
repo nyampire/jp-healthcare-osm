@@ -35,6 +35,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { foldColumns, recheckAddress, adoptRecheck, ADDR_KEYS } = require("./addr_columns.js");
+const { loadPrefBox } = require("./pref_bbox.js");
 
 const SECTORS = {
   hospital: { label: "病院", pattern: /^01-1_hospital_facility_info_.*\.csv$/, name: "正式名称" },
@@ -197,6 +198,17 @@ async function main() {
   const adoptLevel = parseInt(arg("--adopt-level", String(DEFAULT_ADOPT_LEVEL)), 10);
 
   requireLocalApiBase();
+
+  // 矩形の表をここで読む。foldColumns の既定引数から読ませると、最初の行を
+  // 畳むときまで評価されない。表が無い環境では20万件のバッチを流し切った後で
+  // 落ちることになり、数分を捨てる。取得先の検査と同じ場所で止める。
+  try {
+    loadPrefBox();
+  } catch (e) {
+    console.error(`都道府県の外接矩形の表を読めません: ${e.message}`);
+    console.error("mapping/pref_bbox.csv が要ります。npm run build:pref-bbox で作り直せます");
+    process.exit(2);
+  }
 
   const conf = SECTORS[sector];
   const src = findSource(dataDir, conf.pattern);
