@@ -11,6 +11,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { foldColumns, recheckAddress, adoptRecheck } = require("./addr_columns.js");
+const { loadPrefBox, outOfPref, inBox, MARGIN_DEGREES } = require("./pref_bbox.js");
 
 const ROOT = path.dirname(__dirname);
 const FIXTURE = path.join(ROOT, "tests", "known_bad_addr.csv");
@@ -72,6 +73,49 @@ function main() {
 
   checkRecheck();
   checkStartupGuard();
+  checkOutOfPref();
+  checkPrefBoxTable();
+}
+
+/**
+ * mapping/pref_bbox.csv そのものを検査する。
+ *
+ * 表が欠けたり縮んだりすると、正しい座標を県外と誤判定して動かす。
+ * 生成し直したときに気づけるよう、行数と範囲を固定する。
+ */
+function checkPrefBoxTable() {
+  console.log("");
+  const box = loadPrefBox();
+  const names = Object.keys(box);
+  const codes = names.map((n) => box[n].code).sort();
+  const want = Array.from({ length: 47 }, (_, i) => String(i + 1).padStart(2, "0"));
+
+  const cases = [
+    ["47都道府県が揃っている", names.length === 47, String(names.length)],
+    ["コードが01から47まで重複なく並ぶ", codes.join(",") === want.join(","), codes.join(",")],
+    ["矩形の上下と左右が逆転していない",
+      names.every((n) => box[n].latMin < box[n].latMax && box[n].lonMin < box[n].lonMax), ""],
+    ["矩形が日本の範囲に収まる",
+      names.every((n) => box[n].latMin >= 20 && box[n].latMax <= 46
+        && box[n].lonMin >= 122 && box[n].lonMax <= 154), ""],
+    // 東京都の矩形は南鳥島と沖ノ鳥島を含むので、硫黄島の座標を含む。
+    ["硫黄島の座標が東京都の矩形の中にある",
+      inBox(box["東京都"], 24.79439, 141.306414), ""],
+    // 誤りの例。熊本県の施設の座標が愛知県の矩形の中にある。
+    ["熊本県の矩形は愛知県の座標を含まない",
+      inBox(box["熊本県"], 35.085644, 137.190795) === false, ""],
+    ["愛知県の矩形は愛知県の座標を含む",
+      inBox(box["愛知県"], 35.085644, 137.190795), ""],
+  ];
+
+  let failed = 0;
+  for (const [name, ok, actual] of cases) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
+    if (!ok && actual) console.log(`        実際: ${actual}`);
+  }
+  console.log(`\n  ${cases.length - failed}/${cases.length} 件`);
+  if (failed) process.exit(1);
 }
 
 /**
@@ -181,6 +225,144 @@ function checkRecheck() {
     console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
     if (!ok && actual) console.log(`        実際: ${actual}`);
   }
+  if (failed) process.exit(1);
+}
+
+/**
+ * 県外を指す座標の判定を検査する。
+ *
+ * 距離では判定できない。海上自衛隊硫黄島航空基地医務室は正しい座標のまま
+ * 住所点から270.6km離れる。県外かどうかで見ると、硫黄島の座標は東京都の
+ * 矩形の中にあり、誤りの7件は別の県の矩形の中にある。
+ */
+function checkOutOfPref() {
+  console.log("");
+  const cases = [];
+
+  // 実データから採った値を丸めたもの。東京都は南鳥島と沖ノ鳥島を含む。
+  const box = {
+    "熊本県": { code: "43", latMin: 32.1143, latMax: 33.1672, lonMin: 129.9929, lonMax: 131.2894 },
+    "愛知県": { code: "23", latMin: 34.5776, latMax: 35.4245, lonMin: 136.6725, lonMax: 137.8395 },
+    "東京都": { code: "13", latMin: 20.4256, latMax: 35.8580, lonMin: 136.0811, lonMax: 153.9806 },
+  };
+
+  cases.push(["自県の矩形の外かつ他県の矩形の中なら県名を返す",
+    JSON.stringify(outOfPref(box, "熊本県", 35.085644, 137.190795)) === '["愛知県","東京都"]',
+    JSON.stringify(outOfPref(box, "熊本県", 35.085644, 137.190795))]);
+
+  cases.push(["自県の矩形の中なら null を返す",
+    outOfPref(box, "熊本県", 32.95, 131.10) === null, ""]);
+
+  // 硫黄島の実際の座標。東京都の矩形の中にあるので差し替えの対象にしない。
+  cases.push(["硫黄島の座標は東京都の矩形の中にある",
+    outOfPref(box, "東京都", 24.79439, 141.306414) === null, ""]);
+
+  cases.push(["どの県の矩形にも入らなければ null を返す",
+    outOfPref(box, "熊本県", 45.0, 141.0) === null, ""]);
+
+  cases.push(["表に無い県名なら null を返す",
+    outOfPref(box, "沖縄県", 35.085644, 137.190795) === null, ""]);
+
+  cases.push(["県名が空なら null を返す",
+    outOfPref(box, "", 35.085644, 137.190795) === null, ""]);
+
+  // 矩形の縁の外側でも余裕の内側なら自県とみなす。埋立地や岬を吸収する。
+  cases.push(["余裕の内側は自県の矩形の中とみなす",
+    outOfPref(box, "熊本県", 33.1672 + 0.03, 130.5) === null, ""]);
+
+  cases.push(["余裕の外側は自県の矩形の外とみなす",
+    inBox(box["熊本県"], 33.1672 + 0.07, 130.5, MARGIN_DEGREES) === false, ""]);
+
+  // 表の読み込み。区切りだけの単純な CSV で、BOM を落とすことを確かめる。
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "osm-iryo-bbox-"));
+  const file = path.join(dir, "pref_bbox.csv");
+  fs.writeFileSync(file,
+    "﻿都道府県コード,都道府県,lat_min,lat_max,lon_min,lon_max\n"
+    + "13,東京都,20.425600,35.858000,136.081100,153.980600\n"
+    + "43,熊本県,32.114300,33.167200,129.992900,131.289400\n");
+  const loaded = loadPrefBox(file);
+  cases.push(["表を読むと県名で引ける", Object.keys(loaded).length === 2, String(Object.keys(loaded).length)]);
+  cases.push(["BOM を落として県名を読む", loaded["東京都"] !== undefined, Object.keys(loaded).join(",")]);
+  cases.push(["矩形の値を数値で持つ",
+    loaded["熊本県"].latMin === 32.1143 && loaded["熊本県"].lonMax === 131.2894,
+    String(loaded["熊本県"] && loaded["熊本県"].latMin)]);
+  cases.push(["都道府県コードを文字列で持つ",
+    loaded["熊本県"].code === "43", String(loaded["熊本県"] && loaded["熊本県"].code)]);
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  // foldColumns を通したときの出力。差し替えた行が何を持つかを固定する。
+  const nja = {
+    "addr:country": "JP", "addr:province": "熊本県", "addr:county": "",
+    "addr:city": "阿蘇市", "addr:suburb": "内牧", "addr:quarter": "",
+    "addr:neighbourhood": "", "addr:block_number": "", "addr:housenumber": "",
+    "_lat": "32.950000", "_lng": "131.100000", "_座標精度": "3",
+    "_番地の根拠": "推定", "note": "", "fixme": "",
+  };
+  const fold = (rec, la, lo) => foldColumns(rec, la, lo, 8, 1000, box);
+
+  const moved = fold(nja, "35.085644", "137.190795");
+  // 緯度と経度の両方を見る。このリポジトリは「GeoJSON は経度が先。緯度を先に
+  // 置くと日本の施設が海上へ飛ぶ」を警戒しているので、片方だけの検査だと
+  // 経度が落ちる壊れ方や、緯度と経度が入れ替わる壊れ方をすり抜ける。
+  cases.push(["県外の座標を住所点に差し替える",
+    moved.lat === "32.950000" && moved.lon === "131.100000",
+    `${moved.lat}, ${moved.lon}`]);
+  cases.push(["差し替えた行の出典はジオコーディング",
+    moved["座標の出典"] === "ジオコーディング", moved["座標の出典"]]);
+  cases.push(["差し替えた行に要確認が立つ", moved["要確認"] === "yes", moved["要確認"]]);
+  cases.push(["差し替えた行の位置レベルは住所点のもの",
+    moved["位置レベル"] === "3", moved["位置レベル"]]);
+  cases.push(["備考に元の県と落ちた先の県が入る",
+    moved["備考"].includes("熊本県ではなく愛知県と東京都の範囲"), moved["備考"]]);
+  cases.push(["備考に捨てた座標が入る",
+    moved["備考"].includes("元データの座標 35.085644, 137.190795 が"), moved["備考"]]);
+
+  const kept = fold(nja, "32.950000", "131.100000");
+  cases.push(["自県の座標は差し替えない", kept["座標の出典"] === "原データ", kept["座標の出典"]]);
+
+  // レベル2は市区町村の代表点。県境の稜線に建つ山岳診療所を市街地へ動かすので
+  // 対象にしない。鹿島槍冷池山荘診療所（富山県の住所、座標は長野県側）が実例。
+  const lv2 = fold({ ...nja, "_座標精度": "2" }, "35.085644", "137.190795");
+  cases.push(["位置レベル2は差し替えない", lv2["座標の出典"] === "原データ", lv2["座標の出典"]]);
+
+  const lv8 = fold({ ...nja, "_座標精度": "8", "_番地の根拠": "照合済み" },
+    "35.085644", "137.190795");
+  cases.push(["レベル8は1km規則が先に働き、同じ住所点を採る",
+    lv8.lat === "32.950000" && lv8["備考"].includes("離れているため"), lv8["備考"]]);
+  cases.push(["1km規則の備考にも捨てた座標が入る",
+    lv8["備考"].includes("元データの座標 35.085644, 137.190795 が"), lv8["備考"]]);
+
+  const noProv = fold({ ...nja, "addr:province": "" }, "35.085644", "137.190795");
+  cases.push(["県名が空なら差し替えない",
+    noProv["座標の出典"] === "原データ", noProv["座標の出典"]]);
+
+  const noPoint = fold({ ...nja, "_lat": "", "_lng": "" }, "35.085644", "137.190795");
+  cases.push(["住所点が無ければ差し替えない",
+    noPoint["座標の出典"] === "原データ", noPoint["座標の出典"]]);
+
+  // 座標の理由は build_osm.py が読む列。備考の先頭の1文と同じ内容を、
+  // 他の文と混ざらない形で持つ。build_osm.py は備考を定型文に置き換えるので、
+  // 捨てた座標を MapRoulette まで運ぶにはこの列が要る。
+  const why = (rec) => (typeof rec["座標の理由"] === "string"
+    ? rec["座標の理由"] : "(座標の理由の列が無い)");
+  cases.push(["県外の規則が座標の理由に捨てた座標を書く",
+    why(moved).includes("元データの座標 35.085644, 137.190795 が")
+    && why(moved).includes("の範囲にあるため"), why(moved)]);
+  cases.push(["座標の理由が備考の先頭の1文と一致する",
+    why(moved) === moved["備考"].split(" / ")[0], why(moved)]);
+  cases.push(["1km規則も座標の理由を書く",
+    why(lv8).includes("元データの座標 35.085644, 137.190795 が")
+    && why(lv8).includes("離れているため"), why(lv8)]);
+  cases.push(["原データを採った行の座標の理由は空",
+    why(kept) === "", why(kept)]);
+
+  let failed = 0;
+  for (const [name, ok, actual] of cases) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
+    if (!ok && actual) console.log(`        実際: ${actual}`);
+  }
+  console.log(`\n  ${cases.length - failed}/${cases.length} 件`);
   if (failed) process.exit(1);
 }
 

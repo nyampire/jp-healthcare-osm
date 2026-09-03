@@ -30,7 +30,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { resolveFromAddress, distanceMeters, usable } = require("./addr_columns.js");
+const { resolveFromAddress, distanceMeters, usable, discardedCoordText }
+  = require("./addr_columns.js");
 
 const SECTORS = ["hospital", "clinic", "dental", "maternity", "pharmacy"];
 const DEFAULT_ADOPT_LEVEL = 8;
@@ -154,9 +155,10 @@ function main() {
         if (d <= SAME_PLACE_METERS) { stat.同じ建物として残した++; continue; }
       }
 
+      const coord = discardedCoordText(lat, lon);
       const why = shared
-        ? "元データの座標を別の市区町村の施設と共有しているため使わない"
-        : "元データの座標が0.1度の格子に乗る丸め値のため使わない";
+        ? `${coord} を別の市区町村の施設と共有しているため使わない`
+        : `${coord} が0.1度の格子に乗る丸め値のため使わない`;
       if (shared) stat.市区町村またぎ++; else stat.丸め値++;
 
       const level = rec["住所_位置レベル"] === ""
@@ -171,6 +173,9 @@ function main() {
       const notes = [why, r.説明];
       if (rec["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${rec["未解釈の文字列"]}`);
       rec["備考"] = notes.join(" / ");
+      // build_osm.py がジオコーディングの行の備考を作り直すので、理由だけを
+      // 単独で持つ列にも書く。備考に書くだけでは MapRoulette まで届かない。
+      rec["座標の理由"] = why;
 
       const k = rec["座標の出典"] === "ジオコーディング"
         ? "住所から付け直した" : `座標なし ${rec["補完しなかった理由"]}`;

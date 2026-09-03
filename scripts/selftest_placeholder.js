@@ -71,6 +71,9 @@ function main() {
         ["座標の出典", rec["座標の出典"], rec["期待_座標の出典"]],
         ["lat", rec["lat"], rec["期待_lat"]],
         ["補完しなかった理由", rec["補完しなかった理由"], rec["期待_補完しなかった理由"]],
+        // 捨てた座標の値を含む1文。build_osm.py がこの列を読んで
+        // MapRoulette まで運ぶので、備考に書くだけでは作業者に届かない。
+        ["座標の理由", rec["座標の理由"], rec["期待_座標の理由"]],
       ];
       let ok = true;
       for (const [key, actual, expected] of checks) {
