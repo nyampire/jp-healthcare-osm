@@ -21,6 +21,28 @@ const MARGIN_DEGREES = 0.05;
 
 let cache = null;
 
+/**
+ * 表の1行を検査する。読めない値のまま進ませない。
+ *
+ * parseFloat は "\"32.1\"" のような引用符付きの値に NaN を返す。表計算ソフトで
+ * 開いて保存すると入りうる。NaN のまま進むと inBox の比較が常に false になり、
+ * 自県も他県も外れて outOfPref が全行 null を返す。規則が黙って働かなくなり、
+ * 逆テストも通ってしまうので、読んだ時点で止める。
+ *
+ * 上下と左右の逆転も同じ結果になるのでここで落とす。
+ */
+function checkBox(name, b) {
+  for (const [key, v] of [["lat_min", b.latMin], ["lat_max", b.latMax],
+    ["lon_min", b.lonMin], ["lon_max", b.lonMax]]) {
+    if (!Number.isFinite(v)) {
+      throw new Error(`矩形の表の ${name} の ${key} が数値として読めません`);
+    }
+  }
+  if (b.latMin >= b.latMax || b.lonMin >= b.lonMax) {
+    throw new Error(`矩形の表の ${name} の上下または左右が逆転しています`);
+  }
+}
+
 function parseTable(text) {
   const box = {};
   const lines = text.replace(/^﻿/, "").split(/\r?\n/);
@@ -29,13 +51,16 @@ function parseTable(text) {
   for (const line of lines) {
     if (!line.trim()) continue;
     const f = line.split(",");
-    box[f[ix["都道府県"]]] = {
+    const name = f[ix["都道府県"]];
+    const b = {
       code: f[ix["都道府県コード"]],
       latMin: parseFloat(f[ix["lat_min"]]),
       latMax: parseFloat(f[ix["lat_max"]]),
       lonMin: parseFloat(f[ix["lon_min"]]),
       lonMax: parseFloat(f[ix["lon_max"]]),
     };
+    checkBox(name, b);
+    box[name] = b;
   }
   return box;
 }

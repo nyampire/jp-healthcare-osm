@@ -288,6 +288,37 @@ function checkOutOfPref() {
     String(loaded["熊本県"] && loaded["熊本県"].latMin)]);
   cases.push(["都道府県コードを文字列で持つ",
     loaded["熊本県"].code === "43", String(loaded["熊本県"] && loaded["熊本県"].code)]);
+
+  // 数値として読めない表で落ちること。表計算ソフトで開いて保存すると
+  // 引用符が入る。NaN のまま進むと inBox が常に false を返し、自県も他県も
+  // 外れて outOfPref が全行 null になる。規則が黙って死ぬので、その場で止める。
+  const broken = path.join(dir, "broken.csv");
+  fs.writeFileSync(broken,
+    "都道府県コード,都道府県,lat_min,lat_max,lon_min,lon_max\n"
+    + '43,熊本県,"32.114300",33.167200,129.992900,131.289400\n');
+  let threw = "";
+  try {
+    loadPrefBox(broken);
+  } catch (e) {
+    threw = e.message;
+  }
+  cases.push(["数値として読めない矩形で落ちる", threw !== "", threw || "落ちなかった"]);
+  cases.push(["落ちるときに県名を知らせる", threw.includes("熊本県"), threw]);
+
+  // 上下が逆転した矩形も落とす。生成の取り違えで入れ替わると、
+  // inBox が常に false になり、これも規則が黙って死ぬ。
+  const flipped = path.join(dir, "flipped.csv");
+  fs.writeFileSync(flipped,
+    "都道府県コード,都道府県,lat_min,lat_max,lon_min,lon_max\n"
+    + "43,熊本県,33.167200,32.114300,129.992900,131.289400\n");
+  let threw2 = "";
+  try {
+    loadPrefBox(flipped);
+  } catch (e) {
+    threw2 = e.message;
+  }
+  cases.push(["上下が逆転した矩形で落ちる", threw2 !== "", threw2 || "落ちなかった"]);
+
   fs.rmSync(dir, { recursive: true, force: true });
 
   // foldColumns を通したときの出力。差し替えた行が何を持つかを固定する。
