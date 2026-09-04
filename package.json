@@ -2,6 +2,7 @@
   "name": "jp-healthcare-osm",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "医療情報ネット オープンデータを OSM 向けに変換する作業リポジトリ",
   "scripts": {
     "prep:hospital": "python3 scripts/build_opening_hours.py --sector hospital && python3 scripts/build_speciality.py --sector hospital && python3 scripts/build_names.py --sector hospital && node scripts/build_addr.js --sector hospital",

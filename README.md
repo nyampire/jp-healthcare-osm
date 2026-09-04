@@ -137,8 +137,7 @@ export NJA_API_BASE=/path/to/japanese-addresses-v2/out/api/ja
 元の住所文字列の部分文字列で、全件がパースの止まった位置で一致しました。
 価値があるのは中身ではなく「入力のどこを解釈できなかったか」という指し示しのほうで、
 それは作業者に見せる経路があれば足ります。元の住所は `addr:full` に載るので
-あとから参照もできます。詳細は上流の
-[nja-osm-tags Issue 5](https://github.com/nyampire/nja-osm-tags/issues/5) にあります。
+あとから参照もできます。
 
 ## 処理の流れ
 

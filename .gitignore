@@ -20,3 +20,8 @@ __pycache__/
 
 # subagent-driven-development の作業台帳
 .superpowers/
+
+# 作業メモ（非公開）
+docs/handoff/
+docs/superpowers/
+座標の目視確認*
