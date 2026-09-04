@@ -270,6 +270,10 @@ async function main() {
   const out = [outHeader];
   const stat = {};
   const bump = (k) => (stat[k] = (stat[k] || 0) + 1);
+  // 元データの座標を捨てた規則ごとの件数。座標の出典が「ジオコーディング」に
+  // なる行には、住所しか無かった行と、座標があったのに捨てた行の両方が入る。
+  // 後者は少なく、規則が働かなくなっても出典の件数からは分からない。
+  const byRule = {};
 
   for (let i = 0; i < src_rows.length; i++) {
     const r = src_rows[i];
@@ -285,6 +289,8 @@ async function main() {
     bump(f["座標の出典"] === "原データ" ? "原データの座標を採用"
       : f["座標の出典"] === "ジオコーディング" ? "ジオコーディングで補完"
       : `不採用 ${f["補完しなかった理由"]}`);
+    const rule = f["座標の理由の規則"];
+    if (rule) byRule[rule] = (byRule[rule] || 0) + 1;
 
     out.push([
       r[0], r[ix[conf.name]], r[ix["都道府県コード"]],
@@ -308,6 +314,11 @@ async function main() {
   for (const k of Object.keys(stat).sort()) {
     console.log(`  ${k.padEnd(24)} ${stat[k].toLocaleString().padStart(8)}`);
   }
+  // fix_placeholder_coords.js が後から書き込む「座標の共有」の規則はここに出ない。
+  // このスクリプトが自分で当てた2つの規則だけを数える。
+  console.log("座標を住所点に差し替えた規則: "
+    + `県外の規則 ${(byRule["県外の規則"] || 0).toLocaleString()}`
+    + ` / 1km規則 ${(byRule["1km規則"] || 0).toLocaleString()}`);
   const filled = stat["原データの座標を採用"] || 0;
   const added = stat["ジオコーディングで補完"] || 0;
   console.log(`座標がある施設: ${(filled + added).toLocaleString()} / ${(out.length - 1).toLocaleString()}`

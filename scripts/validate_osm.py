@@ -11,6 +11,8 @@
   * addr:province が都道府県コードと一致するか
   * 都道府県別ファイルがあれば、行数の合計と都道府県コードの集合が全国ファイルと
     一致するか（無ければ何もしない）
+  * 隣に geocoded.csv があれば、座標の理由 が 備考 の先頭の1文と一致するか
+    （無ければ何もしない）
 
 終了コード: 欠陥が 1 件でもあれば 1、なければ 0。
 """
@@ -207,6 +209,27 @@ def main():
                 f"全国ファイルに無い都道府県コードの都道府県別ファイル: "
                 f"{','.join(sorted(extra))}")
 
+    # 座標の理由 と 備考 の突き合わせ。build_addr.js は座標を差し替えた理由を
+    # 座標の理由 と 備考 の両方へ書く。build_osm.py は備考を作り直すときに
+    # 座標の理由 だけを運ぶので、2つが食い違うと OSM 側の備考だけが別のことを
+    # 言い、MapRoulette の作業者は捨てられた座標を知らないまま判断することになる。
+    #
+    # 座標の理由 は OSM の CSV には出さない列なので、生成元の geocoded.csv を読む。
+    # selftest_addr.js が同じ不変条件をフィクスチャ1件で見ているが、ここでは
+    # 本番の全行で見る。県別ファイルと同じく、無ければ何もしない。
+    geocoded = os.path.join(os.path.dirname(os.path.dirname(pref_dir)),
+                            "build", sector + "_geocoded.csv")
+    if os.path.exists(geocoded):
+        with open(geocoded, encoding="utf-8-sig", newline="") as f:
+            for g in csv.DictReader(f):
+                why = (g.get("座標の理由") or "").strip()
+                if not why:
+                    continue
+                head = (g.get("備考") or "").split(" / ")[0]
+                if head != why:
+                    add("coord_reason_mismatch", g.get("ID", "-"),
+                        f"備考の先頭が 座標の理由 と違う: {head[:60]}")
+
     # 同一座標に複数の施設が乗っていないか
     coords = collections.Counter((r["lat"], r["lon"]) for r in rows)
     dup = sum(n for n in coords.values() if n > 1)
@@ -252,7 +275,7 @@ def main():
               "coord_range", "name_missing", "type_missing", "unknown_value",
               "bad_website", "bad_key", "tag_too_long", "control_char", "untrimmed",
               "missing_column", "addr_hierarchy", "addr_note_chiban",
-              "addr_province_mismatch",
+              "addr_province_mismatch", "coord_reason_mismatch",
               "coord_cross_city", "pref_split_row_mismatch", "pref_split_missing",
               "pref_split_extra"):
         items = issues.get(k, [])

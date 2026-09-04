@@ -176,8 +176,11 @@ function discardedCoordText(lat, lon) {
  * 理由は 備考 と 座標の理由 の両方に入れる。備考は他の文と " / " で
  * つながるが、build_osm.py はジオコーディングの行の備考を作り直すので、
  * 理由だけを単独で取り出せる列が要る。
+ *
+ * どちらの規則で差し替えたかは rule で別に受ける。理由の文面から読み取ると、
+ * 文面を書き換えたときに数える側が黙って0件になる。
  */
-function adoptAddressPoint(out, nja, level, notes, reason) {
+function adoptAddressPoint(out, nja, level, notes, reason, rule) {
   out.lat = nja["_lat"];
   out.lon = nja["_lng"];
   out["座標の出典"] = "ジオコーディング";
@@ -185,6 +188,7 @@ function adoptAddressPoint(out, nja, level, notes, reason) {
   out["位置レベルの意味"] = POINT_LEVEL_NOTE[level] || "";
   out["要確認"] = "yes";
   out["座標の理由"] = reason;
+  out["座標の理由の規則"] = rule;
   notes.push(reason);
   if (out["未解釈の文字列"]) notes.push(`住所の未解釈部分: ${out["未解釈の文字列"]}`);
   out["備考"] = notes.join(" / ");
@@ -211,6 +215,8 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
     "要確認": "", "備考": "",
     // 元データの座標を捨てた行だけが値を持つ。build_osm.py が読む。
     "座標の理由": "",
+    // 差し替えた規則の名前。CSV には出さず、build_addr.js が数えるだけに使う。
+    "座標の理由の規則": "",
   };
   const notes = [];
 
@@ -236,7 +242,8 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
     if (drift !== null && drift > maxDrift) {
       return adoptAddressPoint(out, nja, level, notes,
         `${discardedCoordText(rawLat, rawLon)} が`
-        + `ジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`);
+        + `ジオコーダ座標から${Math.round(drift).toLocaleString()}m離れているため、ジオコーダ座標を採用`,
+        "1km規則");
     }
 
     // 元データの座標が住所の県ではなく他県の矩形の中にあるなら、住所点を採る。
@@ -255,7 +262,8 @@ function foldColumns(nja, rawLat, rawLon, adoptLevel, maxDrift = MAX_DRIFT_METER
     if (others) {
       return adoptAddressPoint(out, nja, level, notes,
         `${discardedCoordText(rawLat, rawLon)} が`
-        + `${nja["addr:province"]}ではなく${others.join("と")}の範囲にあるため、ジオコーダ座標を採用`);
+        + `${nja["addr:province"]}ではなく${others.join("と")}の範囲にあるため、ジオコーダ座標を採用`,
+        "県外の規則");
     }
 
     out.lat = String(rawLat).trim();

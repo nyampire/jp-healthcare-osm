@@ -66,6 +66,17 @@ function main() {
   }
 
   rows.sort((a, b) => a[0].localeCompare(b[0]));
+
+  // 47県に満たないまま書き出さない。取得先を間違えて指すと都道府県の
+  // ディレクトリが一部しか見つからず、少ない県だけの表ができる。その表では
+  // 載っていない県の施設で outOfPref が null を返し、県外の規則が黙って
+  // 働かなくなる。書き出しより前に落として、既存の表を残す。
+  if (rows.length !== 47) {
+    console.error(`都道府県が47件ではなく${rows.length}件でした。`
+      + `NJA_API_BASE が指す先を確かめてください: ${base}`);
+    process.exit(1);
+  }
+
   fs.writeFileSync(OUT,
     "﻿都道府県コード,都道府県,lat_min,lat_max,lon_min,lon_max\n"
     + rows.map((r) => r.join(",")).join("\n") + "\n");

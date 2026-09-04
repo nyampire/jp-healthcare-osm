@@ -12,15 +12,69 @@ outOfPref は box[province] が引けないとき null を返す。安全側に�
   1. コードと県名の対応が PREF と1件残らず一致する
   2. 県名に重複が無い（重複すると後の行が前の行の矩形を上書きする）
   3. 県名の前後に空白や引用符が混ざっていない
+
+あわせて、生成側が47県に満たない住所データで止まることも確かめる。
 """
 
 import csv
+import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from prefectures import PREF  # noqa: E402
+
+
+
+def check_builder_stops_short(root):
+    """47県に満たない住所データで build_pref_bbox.js が落ちること。
+
+    住所データの取得先を間違えて指すと、都道府県のディレクトリが一部しか
+    見つからない。生成側はそれを検出せず、少ない県だけの表を書き出して
+    終了コード0を返す。その表を pref_bbox.js が読むと、載っていない県の
+    施設は outOfPref が null を返し、県外の規則が黙って働かなくなる。
+
+    2県ぶんの偽の住所データを作って走らせ、終了コードと、
+    mapping/pref_bbox.csv が書き換わっていないことを見る。
+    """
+    table = os.path.join(root, "mapping", "pref_bbox.csv")
+    with open(table, "rb") as f:
+        before = f.read()
+
+    tmp = tempfile.mkdtemp(prefix="osm-iryo-bbox-")
+    try:
+        for name, code in (("東京都", 131011), ("熊本県", 432011)):
+            with open(os.path.join(tmp, name + ".json"), "w", encoding="utf-8") as f:
+                json.dump({"data": [{"code": code}]}, f)
+            os.mkdir(os.path.join(tmp, name))
+            with open(os.path.join(tmp, name, "city.json"), "w", encoding="utf-8") as f:
+                json.dump({"data": [{"point": [139.7, 35.6]},
+                                    {"point": [139.8, 35.7]}]}, f)
+        env = dict(os.environ, NJA_API_BASE=tmp)
+        r = subprocess.run(
+            [shutil.which("node") or "node",
+             os.path.join(root, "scripts", "build_pref_bbox.js")],
+            capture_output=True, text=True, env=env)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    with open(table, "rb") as f:
+        after = f.read()
+    # 検査より前に書き出していると本物の表が2県で潰れる。戻してから落とす。
+    if after != before:
+        with open(table, "wb") as f:
+            f.write(before)
+
+    return [
+        ("47県に満たない住所データで生成側が落ちる", r.returncode, 1),
+        ("落ちるときに県数を知らせる",
+         "47" in r.stderr and "2" in r.stderr, True),
+        ("落ちるとき mapping/pref_bbox.csv を書き換えない", after == before, True),
+    ]
 
 
 def main():
@@ -36,6 +90,7 @@ def main():
         ("県名に空白や引用符が混ざっていない",
          [n for n in names if n != n.strip() or '"' in n], []),
     ]
+    cases += check_builder_stops_short(ROOT)
 
     failed = 0
     print("=== mapping/pref_bbox.csv の県名 逆テスト ===\n")

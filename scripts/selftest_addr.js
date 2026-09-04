@@ -319,6 +319,22 @@ function checkOutOfPref() {
   }
   cases.push(["上下が逆転した矩形で落ちる", threw2 !== "", threw2 || "落ちなかった"]);
 
+  // 既定の表だけを保持する経路。既定以外のファイルを読んでもキャッシュが
+  // 入れ替わらないことを確かめる。入れ替わると、この逆テストが作った2県だけの
+  // 表が本番の判定に持ち込まれ、残る45県の施設が全て「表に無い県名」になって
+  // outOfPref が null を返し、県外の規則が黙って働かなくなる。
+  const cached = loadPrefBox();
+  cases.push(["既定の表を2回読むと同じ物を返す", loadPrefBox() === cached, ""]);
+  cases.push(["既定の表は47県ある",
+    Object.keys(cached).length === 47, String(Object.keys(cached).length)]);
+  const once = loadPrefBox(file);
+  cases.push(["既定以外のファイルに既定の表を返さない", once !== cached,
+    String(Object.keys(once).length)]);
+  cases.push(["既定以外のファイルは毎回読み直す", loadPrefBox(file) !== once, ""]);
+  cases.push(["既定以外を読んだ後も既定の表は47県のまま",
+    loadPrefBox() === cached && Object.keys(loadPrefBox()).length === 47,
+    String(Object.keys(loadPrefBox()).length)]);
+
   fs.rmSync(dir, { recursive: true, force: true });
 
   // foldColumns を通したときの出力。差し替えた行が何を持つかを固定する。
@@ -386,6 +402,16 @@ function checkOutOfPref() {
     && why(lv8).includes("離れているため"), why(lv8)]);
   cases.push(["原データを採った行の座標の理由は空",
     why(kept) === "", why(kept)]);
+
+  // どちらの規則で座標を差し替えたかを、理由の文面ではなく列で持つ。
+  // build_addr.js はこれを数えて標準出力に出す。県外の規則は該当が少なく、
+  // 黙って働かなくなっても出力の件数からは分からない。
+  cases.push(["県外の規則で差し替えた行に規則の名前が付く",
+    moved["座標の理由の規則"] === "県外の規則", String(moved["座標の理由の規則"])]);
+  cases.push(["1km規則で差し替えた行に規則の名前が付く",
+    lv8["座標の理由の規則"] === "1km規則", String(lv8["座標の理由の規則"])]);
+  cases.push(["原データを採った行に規則の名前は付かない",
+    kept["座標の理由の規則"] === "", String(kept["座標の理由の規則"])]);
 
   let failed = 0;
   for (const [name, ok, actual] of cases) {

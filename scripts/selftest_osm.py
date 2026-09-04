@@ -202,10 +202,88 @@ def main():
         print(f"  {'PASS' if ok else 'FAIL'}  全国データに無い都道府県コードのファイルを検出する")
         os.remove(os.path.join(tmp, f"{extra_code}_pref{extra_code}_bad.csv"))
 
+
+        # 座標の理由 と 備考 の先頭の一致（geocoded.csv との突き合わせ）。
+        # build_addr.js は差し替えの理由を 座標の理由 と 備考 の両方へ書く。
+        # build_osm.py は 備考 を作り直すときに 座標の理由 だけを運ぶので、
+        # 2つが食い違うと OSM 側の備考だけが別のことを言う。
+        # 本番の実行では output/build/<業態>_geocoded.csv がその隣にあるので、
+        # 検証器がそれを読んで一致を見る。無ければ何もしない。
+        def run_geocoded(rows):
+            """OSM の出力と geocoded.csv を本番と同じ配置で作って検証器を走らせる。
+
+            rows が None なら geocoded.csv を置かない。
+            """
+            root = os.path.join(tmp, "gc")
+            shutil.rmtree(root, ignore_errors=True)
+            osm_dir = os.path.join(root, "osm", "g")
+            os.makedirs(osm_dir)
+            with open(os.path.join(ROOT, "tests", "known_bad_osm.csv"),
+                      encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                cols = reader.fieldnames
+                good = [x for x in reader if x["ID"] == "T01"]
+            base = os.path.join(osm_dir, "g_osm")
+            with open(base + ".csv", "w", encoding="utf-8-sig", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=cols)
+                w.writeheader()
+                w.writerows(good)
+            with open(base + ".geojson", "w", encoding="utf-8") as f:
+                json.dump({"type": "FeatureCollection", "features": [
+                    {"type": "Feature", "properties": {"_id": "T01"},
+                     "geometry": {"type": "Point",
+                                  "coordinates": [139.771, 35.681]}}]},
+                          f, ensure_ascii=False)
+            if rows is not None:
+                os.makedirs(os.path.join(root, "build"))
+                gpath = os.path.join(root, "build", "g_geocoded.csv")
+                with open(gpath, "w", encoding="utf-8-sig", newline="") as f:
+                    w = csv.writer(f)
+                    w.writerow(["ID", "座標の理由", "備考"])
+                    w.writerows(rows)
+            res = subprocess.run(
+                [sys.executable, os.path.join(ROOT, "scripts", "validate_osm.py"),
+                 base], capture_output=True, text=True)
+            kinds = set()
+            rep = base + "_validation.csv"
+            if os.path.exists(rep):
+                with open(rep, encoding="utf-8-sig", newline="") as f:
+                    kinds = {x["種別"] for x in csv.DictReader(f)}
+            return res.returncode, kinds
+
+        WHY = "元データの座標 35.0, 135.0 が兵庫県ではなく京都府の範囲にあるため、ジオコーダ座標を採用"
+        agree = ["G1", WHY, WHY + " / 住所の未解釈部分: 3階"]
+        disagree = ["G2", WHY, "住所の未解釈部分: 3階 / " + WHY]
+
+        rc, kinds = run_geocoded(None)
+        ok = rc == 0 and "coord_reason_mismatch" not in kinds
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  geocoded.csv が無ければ検出しない")
+        if not ok:
+            print(f"        終了コード {rc} / 検出 {sorted(kinds)}")
+
+        rc, kinds = run_geocoded([agree])
+        ok = rc == 0 and "coord_reason_mismatch" not in kinds
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  座標の理由が備考の先頭と一致すれば検出しない")
+        if not ok:
+            print(f"        終了コード {rc} / 検出 {sorted(kinds)}")
+
+        rc, kinds = run_geocoded([agree, disagree])
+        ok = rc == 1 and "coord_reason_mismatch" in kinds
+        if not ok:
+            failed += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  座標の理由が備考の先頭と食い違えば検出する")
+        if not ok:
+            print(f"        終了コード {rc} / 検出 {sorted(kinds)}")
+
         # EXPECTED の各件 + 単独の検査4件（余分な検出が無い / 不正データで1 /
-        # addr_note_chiban だけなら0 / 残余の列が消えたら分かる）+ 県別分割4件。
+        # addr_note_chiban だけなら0 / 残余の列が消えたら分かる）+ 県別分割4件
+        # + 座標の理由と備考の突き合わせ3件。
         # ここを足し忘れると PASS の行数と集計がずれる。
-        total = len(EXPECTED) + 4 + 4
+        total = len(EXPECTED) + 4 + 4 + 3
         print(f"\n  {total - failed}/{total} 件")
         return 1 if failed else 0
     finally:
