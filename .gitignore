@@ -21,7 +21,15 @@ __pycache__/
 # subagent-driven-development の作業台帳
 .superpowers/
 
-# 作業メモ（非公開）
+# 作業メモと下書き（非公開）
 docs/handoff/
 docs/superpowers/
+docs/data.md
+docs/geocoding-investigation.md
+docs/coord-verification.md
 座標の目視確認*
+
+# OSM wiki に転記する下書き。公開先は wiki なのでここでは追跡しない
+docs/import-plan.md
+docs/wiki-iryo-joho-ja.md
+docs/wiki-iryo-joho-ja-addr.md
