@@ -20,7 +20,7 @@
 | 薬局 | `05_pharmacy_20260601.csv` | 61,398 |
 
 元データと生成物はこのリポジトリに含めていません。
-合計約500MBあり、うち2ファイルは GitHub の100MB制限を超えるためです。
+合計375.9MBあり、うち1ファイルは GitHub の100MB制限を超えるためです。
 配布元から取得してリポジトリ直下に置き、`npm run all` を実行すれば `output/` に再現できます。
 
 
@@ -59,28 +59,28 @@ export NJA_API_BASE=/path/to/japanese-addresses-v2/out/api/ja
 
 | タグ | 対象業態 | 生成数 |
 |---|---|---:|
-| `amenity` | 助産所以外 | 194,871 |
-| `healthcare` | 全業態 | 196,679 |
-| `name` / `official_name` | 全業態 | 196,679 |
-| `short_name` | 略称のある業態 | 95,230 |
-| `name:ja-Hira` | 全業態 | 150,773 |
+| `amenity` | 助産所以外 | 194,872 |
+| `healthcare` | 全業態 | 196,680 |
+| `name` / `official_name` | 全業態 | 196,680 |
+| `short_name` | 略称のある業態 | 95,231 |
+| `name:ja-Hira` | 全業態 | 150,774 |
 | `name:ja-Latn` | 全業態 | 76,199 |
-| `name:en` | 全業態 | 81,588 |
-| `opening_hours` | 全業態 | 190,824 |
-| `healthcare:speciality` | 病院、診療所、歯科診療所 | 137,360 |
-| `website` | 全業態 | 122,080 |
-| `addr:full` | 全業態 | 196,679 |
-| `addr:country` | 全業態 | 196,679 |
-| `addr:province` | 全業態 | 196,679 |
+| `name:en` | 全業態 | 81,589 |
+| `opening_hours` | 全業態 | 190,825 |
+| `healthcare:speciality` | 病院、診療所、歯科診療所 | 137,361 |
+| `website` | 全業態 | 122,081 |
+| `addr:full` | 全業態 | 196,680 |
+| `addr:country` | 全業態 | 196,680 |
+| `addr:province` | 全業態 | 196,680 |
 | `addr:county` | 郡がある住所 | 11,633 |
-| `addr:city` | 全業態 | 196,667 |
+| `addr:city` | 全業態 | 196,668 |
 | `addr:suburb` | 政令指定都市の区など | 47,622 |
 | `addr:quarter` | 町字の下に区分がある住所 | 8,599 |
-| `addr:neighbourhood` | 全業態 | 193,055 |
+| `addr:neighbourhood` | 全業態 | 193,056 |
 | `addr:block_number` | 住居表示の明細と照合できた行 | 88,113 |
 | `addr:housenumber` | 住居表示の明細と照合できた行 | 88,113 |
 | `beds` | 病院、診療所 | 11,677 |
-| `source` | 全業態 | 196,679 |
+| `source` | 全業態 | 196,680 |
 
 `ref` 系のタグは付けていません。
 医療情報ネットの ID を OSM のどのキーで持つかは合意が要るため、`ID` 列を残すに留めています。
@@ -194,7 +194,7 @@ MapRoulette を使う場合は `output/maproulette/` に別形式で出します
 npm run maproulette
 ```
 
-都道府県ごとに分割した line-by-line GeoJSON を、233チャレンジ196,679タスク分出力します。
+都道府県ごとに分割した line-by-line GeoJSON を、233チャレンジ196,680タスク分出力します。
 `index.csv` にチャレンジの一覧と件数が入ります。
 
 途中の生成物と検証材料は次のとおりです。
