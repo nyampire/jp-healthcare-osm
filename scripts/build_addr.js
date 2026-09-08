@@ -35,6 +35,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { foldColumns, recheckAddress, adoptRecheck, ADDR_KEYS } = require("./addr_columns.js");
+const { loadMaster, detectOvermatch } = require("./town_overmatch.js");
 const { loadPrefBox } = require("./pref_bbox.js");
 
 const SECTORS = {
@@ -102,6 +103,7 @@ function findSource(dir, pattern) {
  */
 function requireLocalApiBase() {
   const raw = (process.env[API_BASE_ENV] || "").trim();
+  // 町字マスタの照会にも同じパスを使うので、検査した値を返す
   if (!raw) {
     console.error(`住所データの取得先が設定されていません: ${API_BASE_ENV}`);
     console.error("japanese-addresses-v2 を手元に構築し、その out/api/ja を指してください");
@@ -115,6 +117,28 @@ function requireLocalApiBase() {
     console.error("20万件の問い合わせは相手にも負荷をかけます");
     process.exit(2);
   }
+  return raw;
+}
+
+/**
+ * 誤った町字が出た行を見分けて、正しい町字の候補を返す。
+ *
+ * 町字マスタは市区町村ごとの JSON なので、同じ市区町村が続く間は読み直さない。
+ * 全国で1,900程度のファイルにしかならず、20万行を通しても読み込みは
+ * その回数で済む。判定そのものは town_overmatch.js にある。
+ */
+function makeOvermatchFinder(base) {
+  const cache = new Map();
+  return (nja) => {
+    const pref = (nja["addr:province"] || "").trim();
+    // マスタのファイル名は郡と区まで含む。三浦郡葉山町.json、横浜市鶴見区.json
+    const city = ["addr:county", "addr:city", "addr:suburb"]
+      .map((k) => (nja[k] || "").trim()).join("");
+    if (!pref || !city) return "";
+    const key = `${pref}/${city}`;
+    if (!cache.has(key)) cache.set(key, loadMaster(base, pref, city));
+    return detectOvermatch(nja, cache.get(key));
+  };
 }
 
 /** nja-osm-tags のバッチを呼び、出力を行の配列で返す */
@@ -197,7 +221,7 @@ async function main() {
   const limit = parseInt(arg("--limit", "0"), 10);
   const adoptLevel = parseInt(arg("--adopt-level", String(DEFAULT_ADOPT_LEVEL)), 10);
 
-  requireLocalApiBase();
+  const apiBase = requireLocalApiBase();
 
   // 矩形の表をここで読む。foldColumns の既定引数から読ませると、最初の行を
   // 畳むときまで評価されない。表が無い環境では20万件のバッチを流し切った後で
@@ -266,8 +290,13 @@ async function main() {
     // 列は末尾に足す。この CSV を読む側は全てヘッダ名で引いているが、
     // 末尾なら既存の列の位置が動かない。
     "座標の理由",
+    // 入力とは別の大字が町字として出た行の、正しい町字の候補。
+    // 空でない行は build_osm.py が addr:neighbourhood を出さない。
+    "町字の修正候補",
   ];
   const out = [outHeader];
+  const findOvermatch = makeOvermatchFinder(apiBase);
+  let overmatched = 0;
   const stat = {};
   const bump = (k) => (stat[k] = (stat[k] || 0) + 1);
   // 元データの座標を捨てた規則ごとの件数。座標の出典が「ジオコーディング」に
@@ -285,6 +314,8 @@ async function main() {
     const rawLat = r[ix["所在地座標（緯度）"]].trim();
     const rawLon = r[ix["所在地座標（経度）"]].trim();
     const f = foldColumns(nja, rawLat, rawLon, adoptLevel);
+    const townFix = findOvermatch(nja);
+    if (townFix) overmatched++;
 
     bump(f["座標の出典"] === "原データ" ? "原データの座標を採用"
       : f["座標の出典"] === "ジオコーディング" ? "ジオコーディングで補完"
@@ -301,7 +332,7 @@ async function main() {
       f["番地の根拠"], f["正規化住所"], f["未解釈の文字列"],
       f["fixme"],
       ...ADDR_KEYS.map((k) => nja[k] || ""),
-      f["要確認"], f["備考"], f["座標の理由"],
+      f["要確認"], f["備考"], f["座標の理由"], townFix,
     ]);
   }
 
@@ -316,6 +347,8 @@ async function main() {
   }
   // fix_placeholder_coords.js が後から書き込む「座標の共有」の規則はここに出ない。
   // このスクリプトが自分で当てた2つの規則だけを数える。
+  console.log(`入力とは別の大字が出た行: ${overmatched.toLocaleString()}`
+    + "（addr:neighbourhood を出さず、修正候補を備考に回す）");
   console.log("座標を住所点に差し替えた規則: "
     + `県外の規則 ${(byRule["県外の規則"] || 0).toLocaleString()}`
     + ` / 1km規則 ${(byRule["1km規則"] || 0).toLocaleString()}`);

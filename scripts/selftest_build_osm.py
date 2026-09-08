@@ -18,7 +18,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_osm import coord_note, join_notes  # noqa: E402
+from build_osm import (coord_note, join_notes, needs_review,  # noqa: E402
+                       resolve_neighbourhood)
 
 
 def main():
@@ -54,6 +55,47 @@ def main():
          join_notes(["行に固有"], []), "行に固有"),
         ("最悪の組み合わせでも理由が先頭200文字に丸ごと残る",
          reason in worst[:200], True),
+    ]
+
+    # 誤った町字が出た行。addr:neighbourhood を出さず、修正候補を備考に回す。
+    # 修正候補は行ごとに違うので join_notes の specific 側に入り、
+    # MapRoulette の200文字で切られても先頭に残る。
+    cases += [
+        ("修正候補があれば addr:neighbourhood を出さない",
+         resolve_neighbourhood({"addr:neighbourhood": "鶴見町",
+                                "町字の修正候補": "鶴見中央"})[0], ""),
+        ("修正候補があれば備考に候補を書く",
+         resolve_neighbourhood({"addr:neighbourhood": "鶴見町",
+                                "町字の修正候補": "鶴見中央"})[1],
+         "町字が入力と別のものになったため addr:neighbourhood を出さない。"
+         "修正候補: 鶴見中央"),
+        ("修正候補が無ければ町字をそのまま出す",
+         resolve_neighbourhood({"addr:neighbourhood": "生麦一丁目",
+                                "町字の修正候補": ""}),
+         ("生麦一丁目", "")),
+        ("修正候補の列が無くても町字をそのまま出す",
+         resolve_neighbourhood({"addr:neighbourhood": "生麦一丁目"}),
+         ("生麦一丁目", "")),
+        ("町字も修正候補も無ければ両方とも空",
+         resolve_neighbourhood({}), ("", "")),
+    ]
+
+    # 要確認 の判定。build_maproulette.py は 要確認 が立った行にしか
+    # 備考をタスクへ載せないので、町字を出さなかった行はここで立てないと
+    # 修正候補が作業者に届かない。
+    cases += [
+        ("町字を出さなかった行は要確認にする",
+         needs_review({}, {}, {}, "exact", "町字が入力と別"), "yes"),
+        ("どれにも当たらない行は要確認にしない",
+         needs_review({}, {}, {}, "exact", ""), ""),
+        ("名称が要確認なら要確認にする",
+         needs_review({"要確認": "yes"}, {}, {}, "exact", ""), "yes"),
+        ("営業時間が要確認なら要確認にする",
+         needs_review({}, {"要確認": "yes"}, {}, "exact", ""), "yes"),
+        ("住所が要確認なら要確認にする",
+         needs_review({}, {}, {"要確認": "yes"}, "exact", ""), "yes"),
+        ("施設種別が推定なら要確認にする",
+         needs_review({}, {}, {}, "broader", ""), "yes"),
     ]
 
     failed = 0

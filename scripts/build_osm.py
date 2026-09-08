@@ -165,6 +165,48 @@ def coord_note(g):
     return why or f"座標は住所から付与（位置レベル{g['位置レベル']}）"
 
 
+def resolve_neighbourhood(g):
+    """addr:neighbourhood に出す値と、備考に積む1文を返す。
+
+    NJA は `○○町` の `町` を落とした別名を町字パターンとして登録する。
+    入力が指す町字を照合できなかった行では、その別名が最後に拾い、
+    入力とは別の大字が町字として出る。実データで401行あった。
+    誤った町字は OSM 上で別の場所を指すため、出さないほうがましと判断した。
+
+    どの行がそれかは build_addr.js が町字マスタに照会して決め、
+    正しい町字の候補を 町字の修正候補 列に入れている。判定の中身は
+    scripts/town_overmatch.js にある。
+
+    元の住所文字列は addr:full に全件残るので、情報は失われない。
+    修正候補は備考に回し、MapRoulette で作業者に見せる。
+    行ごとに違う文なので、200文字で切られても先頭に残る。
+
+    町字の修正候補 の列が無い古い geocoded.csv でも、町字をそのまま返して動く。
+    """
+    fix = (g.get("町字の修正候補") or "").strip()
+    if not fix:
+        return g.get("addr:neighbourhood", ""), ""
+    return "", ("町字が入力と別のものになったため addr:neighbourhood を出さない。"
+                f"修正候補: {fix}")
+
+
+def needs_review(nm, hr, g, confidence, town_why):
+    """作業者の確認が要る行かどうかを決める。
+
+    build_maproulette.py は 要確認 が立った行にしか備考をタスクへ載せない。
+    町字を出さなかった行をここで立てないと、修正候補が作業者に届かない。
+    実際、立てる前は384行のうち213行にしか候補が載らなかった。
+
+    住所の町字が入力と別のものになった行は、住所そのものが確認の対象なので
+    立てる意味も揃っている。
+    """
+    if nm.get("要確認") or hr.get("要確認") or g.get("要確認"):
+        return "yes"
+    if confidence == "broader" or town_why:
+        return "yes"
+    return ""
+
+
 def check_pref_codes(rows):
     """都道府県コードが表にあることを、どのファイルも書き出す前に確かめる。
 
@@ -355,6 +397,11 @@ def main():
         if inferred and (g.get("addr:block_number") or g.get("addr:housenumber")):
             notes.append("番地が推定のため addr:block_number と addr:housenumber を出さない")
 
+        neighbourhood, town_why = resolve_neighbourhood(g)
+        if town_why:
+            notes.append(town_why)
+            stat["町字を出さなかった"] += 1
+
         tags = {
             "amenity": ft["amenity"].strip(),
             "healthcare": ft["healthcare"].strip(),
@@ -374,7 +421,7 @@ def main():
             "addr:city": g.get("addr:city", ""),
             "addr:suburb": g.get("addr:suburb", ""),
             "addr:quarter": g.get("addr:quarter", ""),
-            "addr:neighbourhood": g.get("addr:neighbourhood", ""),
+            "addr:neighbourhood": neighbourhood,
             "addr:block_number": block_number,
             "addr:housenumber": housenumber,
             # note と fixme はタグにしない。上流 nja-osm-tags の Issue 5 で、
@@ -387,8 +434,7 @@ def main():
         }
         tags = {k: v for k, v in tags.items() if v}
 
-        review = "yes" if (nm.get("要確認") or hr.get("要確認") or g.get("要確認")
-                           or ft["確度"] == "broader") else ""
+        review = needs_review(nm, hr, g, ft["確度"], town_why)
         rows.append((fid, g["都道府県コード"], la, lo, g["座標の出典"], tags, review,
                      join_notes(notes, common),
                      g.get("未解釈の文字列", ""), g.get("fixme", "")))
