@@ -8,7 +8,8 @@
   mapping/speciality_mapping.csv         診療科目コード → OSM 値の対応表
 
 出力 (output/build/):
-  <業態>_speciality.csv  施設単位の healthcare:speciality と、丸めた診療科の内訳
+  <業態>_speciality.csv  施設単位の healthcare:speciality と emergency、
+                         および丸めた診療科の内訳
 
   同じコードが業態によって別の意味で使われることがあるため、対応表は業態別の
   上書きを持てる。例えば 08991 は病院では口腔腫瘍外科だが、歯科診療所では
@@ -56,6 +57,11 @@ ROLLUP_DEFAULT = os.path.join("mapping", "speciality_rollup.csv")
 MAX_TAG_LENGTH = 255
 # 畳んでも収まらない施設に与える値
 CATCH_ALL_VALUE = "general"
+
+# 救急科の診療科目コード。build_opening_hours.py の EMERGENCY_CODES と同じ値を
+# 持つ。対応表 mapping/speciality_mapping.csv の値ではなくコードで判定するのは、
+# 対応表を書き換えたときに emergency タグの出方まで変わるのを避けるため。
+EMERGENCY_CODES = {"09010"}
 
 
 def load_mapping(path):
@@ -196,7 +202,10 @@ def main():
             notes.append(f"対応値なしで出力しなかった診療科 {len(unmapped)}件: "
                          + "、".join(unmapped[:3]))
         name, pref = names.get(fid, ("", ""))
-        rows.append([fid, name, pref, value, len(depts), len(emitted),
+        # 255文字への短縮より前に決める。短縮後の値からは救急科の有無を
+        # 復元できないため、fit_to_limit の結果とは独立に depts から取る。
+        emergency = "yes" if depts.keys() & EMERGENCY_CODES else ""
+        rows.append([fid, name, pref, value, emergency, len(depts), len(emitted),
                      len(broader), len(unmapped), shortening, " / ".join(notes)])
         stats["施設"] += 1
         if value:
@@ -212,6 +221,7 @@ def main():
               encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["ID", "正式名称", "都道府県コード", "healthcare:speciality",
+                    "emergency",
                     "診療科数", "値の数", "丸めた数", "未対応数", "短縮", "備考"])
         w.writerows(sorted(rows))
 

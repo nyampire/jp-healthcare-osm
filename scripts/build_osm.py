@@ -5,7 +5,7 @@
   <業態>_geocoded.csv       座標と住所（元の値と付与した値）
   <業態>_names.csv          name 系のタグ
   <業態>_opening_hours.csv  opening_hours
-  <業態>_speciality.csv     healthcare:speciality（3業態のみ）
+  <業態>_speciality.csv     healthcare:speciality と emergency（3業態のみ）
   NN-*_..._YYYYMMDD.csv     施設票（website、病床数など未加工の列）
   mapping/facility_tags.csv 業態から amenity と healthcare への対応
 
@@ -163,6 +163,23 @@ def coord_note(g):
     """
     why = (g.get("座標の理由") or "").strip()
     return why or f"座標は住所から付与（位置レベル{g['位置レベル']}）"
+
+
+def emergency_tag(amenity, sp):
+    """救急科の有無を emergency=yes として返す。出さないときは空文字。
+
+    OSM wiki で emergency=* が文書化されているのは Tag:amenity=hospital の項
+    なので、診療所（amenity=clinic と amenity=doctors）と歯科診療所には出さない。
+    診療所で救急科を持つ施設は healthcare:speciality に emergency が残っており、
+    タグを足しても情報が増えないという事情もある。
+
+    値は <業態>_speciality.csv の emergency 列から取る。この列は
+    healthcare:speciality を255文字へ短縮するより前に決まっているため、
+    値が general の1語に潰れた病院でも救急科の有無が残る。
+    """
+    if amenity != "hospital":
+        return ""
+    return sp.get("emergency", "")
 
 
 def resolve_neighbourhood(g):
@@ -413,6 +430,7 @@ def main():
             "name:en": nm.get("name:en", ""),
             "opening_hours": oh,
             "healthcare:speciality": sp.get("healthcare:speciality", ""),
+            "emergency": emergency_tag(ft["amenity"].strip(), sp),
             "website": website,
             "addr:full": g["元_所在地"],
             "addr:country": g.get("addr:country", ""),
@@ -448,7 +466,7 @@ def main():
 
     keys = ["amenity", "healthcare", "name", "official_name", "short_name",
             "name:ja-Hira", "name:ja-Latn", "name:en", "opening_hours",
-            "healthcare:speciality", "website", "addr:full",
+            "healthcare:speciality", "emergency", "website", "addr:full",
             "addr:country", "addr:province", "addr:county", "addr:city",
             "addr:suburb", "addr:quarter", "addr:neighbourhood",
             "addr:block_number", "addr:housenumber",

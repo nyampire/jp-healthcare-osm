@@ -18,8 +18,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_osm import (coord_note, join_notes, needs_review,  # noqa: E402
-                       resolve_neighbourhood)
+from build_osm import (coord_note, emergency_tag, join_notes,  # noqa: E402
+                       needs_review, resolve_neighbourhood)
 
 
 def main():
@@ -96,6 +96,26 @@ def main():
          needs_review({}, {}, {"要確認": "yes"}, "exact", ""), "yes"),
         ("施設種別が推定なら要確認にする",
          needs_review({}, {}, {}, "broader", ""), "yes"),
+    ]
+
+    # 救急科。emergency=yes は healthcare:speciality とは別の列から決まる。
+    # 255文字の上限に当たった施設では healthcare:speciality が general の
+    # 1語に潰れるが、その潰れた後の値からは救急科の有無を復元できない。
+    # <業態>_speciality.csv の emergency 列は潰す前に決まっているので、
+    # 潰れた施設でもタグが残ることをここで固定する。
+    cases += [
+        ("general に潰れた病院でも emergency を出す",
+         emergency_tag("hospital", {"healthcare:speciality": "general",
+                                    "emergency": "yes"}), "yes"),
+        ("救急科の無い病院には emergency を出さない",
+         emergency_tag("hospital", {"healthcare:speciality": "general",
+                                    "emergency": ""}), ""),
+        ("診療所には emergency を出さない",
+         emergency_tag("clinic", {"emergency": "yes"}), ""),
+        ("医院には emergency を出さない",
+         emergency_tag("doctors", {"emergency": "yes"}), ""),
+        ("emergency の列が無くても止まらない",
+         emergency_tag("hospital", {}), ""),
     ]
 
     failed = 0
