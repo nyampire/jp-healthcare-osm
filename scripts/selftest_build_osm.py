@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_osm import (coord_note, emergency_tag, join_notes,  # noqa: E402
-                       needs_review, resolve_neighbourhood)
+                       needs_review, number_note, resolve_neighbourhood)
 
 
 def main():
@@ -122,6 +122,27 @@ def main():
          emergency_tag("doctors", {"emergency": "yes"}), ""),
         ("emergency の列が無くても止まらない",
          emergency_tag("hospital", {}), ""),
+    ]
+
+    # 推定の番地を出さなかった行の1文。build_addr.js が町字の明細に照らして
+    # 決めた 番地の判定 列を読む。どの判定でも番地は出さないので、変わるのは
+    # 作業者が現地で何を調べるかである。
+    cases += [
+        ("地番と分かった行は地番のためと書く",
+         number_note({"番地の判定": "地番"}),
+         "地番のため addr:block_number と addr:housenumber を出さない"),
+        ("どちらの明細にも無い行は見つからないと書く",
+         number_note({"番地の判定": "不一致"}),
+         "番地が住居表示にも地番にも見つからないため出さない"),
+        ("照合できない行は明細が無いと書く",
+         number_note({"番地の判定": "判定不能"}),
+         "照合する明細が無いため番地を出さない"),
+        ("判定が空なら推定のためと書く",
+         number_note({"番地の判定": ""}),
+         "番地が推定のため addr:block_number と addr:housenumber を出さない"),
+        ("番地の判定の列が無くても止まらない",
+         number_note({}),
+         "番地が推定のため addr:block_number と addr:housenumber を出さない"),
     ]
 
     failed = 0

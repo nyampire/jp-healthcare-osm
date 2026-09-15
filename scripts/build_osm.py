@@ -211,6 +211,31 @@ def resolve_neighbourhood(g):
                 f"修正候補: {fix}")
 
 
+def number_note(g):
+    """推定の番地を出さなかった行の 備考 に積む1文を返す。
+
+    どの判定でも番地は出さない。vendor/nja-osm-tags/src/numbers.ts の
+    ライセンス要件により、地番方式の番地は出さないと決まっているため、
+    地番と確定することは出してはいけない値だと確定することである。
+    変わるのは作業者が現地で何を調べるかで、地番と分かった行は住居表示を
+    調べる作業になり、どちらの明細にも無い行は元データの住所そのものを疑う。
+
+    判定は build_addr.js が町字の明細に照らして決め、番地の判定 列に
+    入れている。判定の中身は scripts/number_source.js にある。
+
+    判定を保留した行には、今までどおり推定であることだけを書く。
+    番地の判定 の列が無い古い geocoded.csv でも、同じ文を返して動く。
+    """
+    judge = (g.get("番地の判定") or "").strip()
+    if judge == "地番":
+        return "地番のため addr:block_number と addr:housenumber を出さない"
+    if judge == "不一致":
+        return "番地が住居表示にも地番にも見つからないため出さない"
+    if judge == "判定不能":
+        return "照合する明細が無いため番地を出さない"
+    return "番地が推定のため addr:block_number と addr:housenumber を出さない"
+
+
 def needs_review(nm, hr, g, town_why, housenumber_dropped):
     """作業者の確認が要る行かどうかを決める。
 
@@ -430,7 +455,8 @@ def main():
         housenumber_dropped = bool(
             inferred and (g.get("addr:block_number") or g.get("addr:housenumber")))
         if housenumber_dropped:
-            notes.append("番地が推定のため addr:block_number と addr:housenumber を出さない")
+            notes.append(number_note(g))
+            stat[f"番地の判定 {g.get('番地の判定') or '保留'}"] += 1
 
         neighbourhood, town_why = resolve_neighbourhood(g)
         if town_why:

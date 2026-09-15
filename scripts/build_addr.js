@@ -22,6 +22,11 @@
  *   番地が推定になった行は、番地だけの住所に組み直してもう一度通す。
  *   建物名で明細照合が外れていただけの行を照合済みに戻すため。
  *
+ *   それでも推定のまま残った行は、町字の明細に照らして 地番 / 不一致 /
+ *   判定不能 に振り分け、番地の判定 列に入れる。判定の中身は
+ *   number_source.js にあり、build_osm.py が備考の文を選ぶのに使う。
+ *   どの判定でも番地は出さない。
+ *
  *   地番方式の住所の座標は補完に使わない。nja-osm-tags がライセンス上の
  *   措置として返さないため、こちら側にも値が来ない。
  *   件数は 補完しなかった理由 列で数えられる。
@@ -36,6 +41,7 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 const { foldColumns, recheckAddress, adoptRecheck, ADDR_KEYS } = require("./addr_columns.js");
 const { loadMaster, detectOvermatch } = require("./town_overmatch.js");
+const { judgeNumber, loadTowns, loadDetail } = require("./number_source.js");
 const { loadPrefBox } = require("./pref_bbox.js");
 
 const SECTORS = {
@@ -138,6 +144,51 @@ function makeOvermatchFinder(base) {
     const key = `${pref}/${city}`;
     if (!cache.has(key)) cache.set(key, loadMaster(base, pref, city));
     return detectOvermatch(nja, cache.get(key));
+  };
+}
+
+/**
+ * 推定のまま残った行の番地を、町字の明細に照らして判定する関数を返す。
+ *
+ * 町字マスタも明細も市区町村ごとのファイルなので、同じ市区町村が続く間は
+ * 読み直さない。明細は町字ごとに数KBから数百KBあり、20万行を通すと
+ * 読み直しの回数がそのまま時間になる。
+ *
+ * 推定 以外の行は判定しない。照合済みの行は番地を出しており、番地が無い行は
+ * 落ちるものが無い。
+ */
+function makeNumberJudge(base) {
+  const towns = new Map();
+  const details = new Map();
+  return (nja) => {
+    if ((nja["_番地の根拠"] || "") !== "推定") return "";
+    const pref = (nja["addr:province"] || "").trim();
+    const city = ["addr:county", "addr:city", "addr:suburb"]
+      .map((k) => (nja[k] || "").trim()).join("");
+    const town = ["addr:quarter", "addr:neighbourhood"]
+      .map((k) => (nja[k] || "").trim()).join("");
+    const blk = (nja["addr:block_number"] || "").trim();
+    if (!blk) return "";
+    if (!pref || !city || !town) return "判定不能";
+
+    const cityKey = `${pref}/${city}`;
+    if (!towns.has(cityKey)) towns.set(cityKey, loadTowns(base, pref, city));
+    const master = towns.get(cityKey);
+    const rec = master ? master.get(town) : null;
+    if (!rec) return "判定不能";
+
+    const ranges = rec.csv_ranges || {};
+    const detail = {};
+    for (const kind of ["住居表示", "地番"]) {
+      const range = ranges[kind];
+      if (!range) { detail[kind] = null; continue; }
+      const key = `${cityKey}/${kind}/${range.start}`;
+      if (!details.has(key)) {
+        details.set(key, loadDetail(base, pref, city, kind, range));
+      }
+      detail[kind] = details.get(key);
+    }
+    return judgeNumber(blk, nja["addr:housenumber"], detail);
   };
 }
 
@@ -293,10 +344,17 @@ async function main() {
     // 入力とは別の大字が町字として出た行の、正しい町字の候補。
     // 空でない行は build_osm.py が addr:neighbourhood を出さない。
     "町字の修正候補",
+    // 推定のまま残った番地の判定。地番 / 不一致 / 判定不能 のどれか。
+    // 推定 以外の行と、判定を保留した行は空になる。
+    // build_osm.py が備考の文を選ぶのに読む。
+    "番地の判定",
   ];
   const out = [outHeader];
   const findOvermatch = makeOvermatchFinder(apiBase);
+  const judgeInferred = makeNumberJudge(apiBase);
   let overmatched = 0;
+  // 推定のまま残った番地の判定ごとの件数
+  const byJudge = {};
   const stat = {};
   const bump = (k) => (stat[k] = (stat[k] || 0) + 1);
   // 元データの座標を捨てた規則ごとの件数。座標の出典が「ジオコーディング」に
@@ -316,6 +374,8 @@ async function main() {
     const f = foldColumns(nja, rawLat, rawLon, adoptLevel);
     const townFix = findOvermatch(nja);
     if (townFix) overmatched++;
+    const judge = judgeInferred(nja);
+    if (judge) byJudge[judge] = (byJudge[judge] || 0) + 1;
 
     bump(f["座標の出典"] === "原データ" ? "原データの座標を採用"
       : f["座標の出典"] === "ジオコーディング" ? "ジオコーディングで補完"
@@ -332,7 +392,7 @@ async function main() {
       f["番地の根拠"], f["正規化住所"], f["未解釈の文字列"],
       f["fixme"],
       ...ADDR_KEYS.map((k) => nja[k] || ""),
-      f["要確認"], f["備考"], f["座標の理由"], townFix,
+      f["要確認"], f["備考"], f["座標の理由"], townFix, judge,
     ]);
   }
 
@@ -349,6 +409,10 @@ async function main() {
   // このスクリプトが自分で当てた2つの規則だけを数える。
   console.log(`入力とは別の大字が出た行: ${overmatched.toLocaleString()}`
     + "（addr:neighbourhood を出さず、修正候補を備考に回す）");
+  console.log("推定のまま残った番地の判定: "
+    + `地番 ${(byJudge["地番"] || 0).toLocaleString()}`
+    + ` / 不一致 ${(byJudge["不一致"] || 0).toLocaleString()}`
+    + ` / 判定不能 ${(byJudge["判定不能"] || 0).toLocaleString()}`);
   console.log("座標を住所点に差し替えた規則: "
     + `県外の規則 ${(byRule["県外の規則"] || 0).toLocaleString()}`
     + ` / 1km規則 ${(byRule["1km規則"] || 0).toLocaleString()}`);
