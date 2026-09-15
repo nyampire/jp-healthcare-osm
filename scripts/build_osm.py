@@ -139,9 +139,13 @@ def join_notes(specific, common):
 
     行ごとに違う文を先に、全行に同じ文字列で付く定型文を最後に置く。
     build_maproulette.py が _要確認 を200文字で切るため、並び順がそのまま
-    「切られたときに何が残るか」を決める。施設種別の推定を告げる定型文は
-    72,962行すべてに同じ85文字で付き、その行については何も語らない。
-    これが先頭にあると、行ごとに違う文が200文字の外へ押し出される。
+    「切られたときに何が残るか」を決める。全行に同じ文字列で付く文は、
+    切られても失われるものが無い。行ごとに違う文は、その行からしか
+    得られないため、先に置いて200文字の内側に残す。
+
+    common に入る文は現在ない。施設種別の推定を告げる定型文がここに入って
+    いたが、行を選り分けないため備考に書くのをやめた。並び順の規則は、
+    業態共通の文を足すときのために残している。
 
     OSM の CSV の 備考 には両方とも出る。落ちるのは MapRoulette 側だけ。
     """
@@ -207,7 +211,7 @@ def resolve_neighbourhood(g):
                 f"修正候補: {fix}")
 
 
-def needs_review(nm, hr, g, confidence, town_why):
+def needs_review(nm, hr, g, town_why, housenumber_dropped):
     """作業者の確認が要る行かどうかを決める。
 
     build_maproulette.py は 要確認 が立った行にしか備考をタスクへ載せない。
@@ -215,11 +219,18 @@ def needs_review(nm, hr, g, confidence, town_why):
     実際、立てる前は384行のうち213行にしか候補が載らなかった。
 
     住所の町字が入力と別のものになった行は、住所そのものが確認の対象なので
-    立てる意味も揃っている。
+    立てる意味も揃っている。番地を出さなかった行も同じで、元データに番地が
+    あったが推定なので出さなかったのか、元データに番地が無かったのかは、
+    出力を見ただけでは区別できない。前者なら作業者は現地を見れば済む。
+
+    施設種別の推定（mapping/facility_tags.csv の 確度=broader）はここで
+    立てない。診療所の72,962行すべてに同じ形で当てはまり、行を選り分けない
+    ためで、立てていた頃は診療所77,188行のうち75,309行で立っていた。
+    そのうち57,011行は、備考に業態共通の定型文しか無かった。
     """
     if nm.get("要確認") or hr.get("要確認") or g.get("要確認"):
         return "yes"
-    if confidence == "broader" or town_why:
+    if town_why or housenumber_dropped:
         return "yes"
     return ""
 
@@ -373,8 +384,11 @@ def main():
         if ft is None:
             sys.exit(f"施設種別の対応が見つかりません: {args.sector} / {cond}")
         if ft["確度"] == "broader":
-            # 全行に同じ文字列で付く定型文。備考の最後に回す。
-            common.append(f"施設種別を推定: {ft['備考']}")
+            # 施設種別の推定は 備考 に書かない。amenity=doctors に倒した判断は
+            # 診療所の全行に同じ形で当てはまり、その行については何も語らない。
+            # 行ごとに書くと、MapRoulette の作業者は同じ85文字を繰り返し読む
+            # ことになる。周知はチャレンジの説明に一度だけ置く。
+            # 判断の根拠は mapping/facility_tags.csv の 備考 列に残っている。
             stat["施設種別が推定"] += 1
 
         website = ""
@@ -411,7 +425,11 @@ def main():
         inferred = g.get("番地の根拠", "") == "推定"
         block_number = "" if inferred else g.get("addr:block_number", "")
         housenumber = "" if inferred else g.get("addr:housenumber", "")
-        if inferred and (g.get("addr:block_number") or g.get("addr:housenumber")):
+        # 備考と 要確認 の両方がこの条件を見る。2箇所に書くと食い違うため
+        # 1つの変数にまとめる。推定でも元データに番地が無ければ何も落ちない。
+        housenumber_dropped = bool(
+            inferred and (g.get("addr:block_number") or g.get("addr:housenumber")))
+        if housenumber_dropped:
             notes.append("番地が推定のため addr:block_number と addr:housenumber を出さない")
 
         neighbourhood, town_why = resolve_neighbourhood(g)
@@ -452,7 +470,7 @@ def main():
         }
         tags = {k: v for k, v in tags.items() if v}
 
-        review = needs_review(nm, hr, g, ft["確度"], town_why)
+        review = needs_review(nm, hr, g, town_why, housenumber_dropped)
         rows.append((fid, g["都道府県コード"], la, lo, g["座標の出典"], tags, review,
                      join_notes(notes, common),
                      g.get("未解釈の文字列", ""), g.get("fixme", "")))
