@@ -309,25 +309,28 @@ def resolve(base, pattern):
 
 
 
-def needs_review(name, en, name_en, name_latn):
+def needs_review(name):
     """作業者の確認が要る施設かどうかを決める。
+
+    立てるのは name が空の施設だけである。出力する名前そのものが無いので、
+    元データを見ないとタグを埋められない。
+
+    理由にしないものが2つある。どちらも、出力そのものには欠けが無い。
 
     運営主体を除去したことは理由にしない。除去した文字列は official_name に
     そのまま残り、operator も出していないため、作業者が現地で確かめる対象が
-    無い。5業態で47,626行が該当し、行を選り分けないまま 要確認 を立てていた。
-    mapping/facility_tags.csv の 確度=broader を build_osm.py の needs_review
-    から外したのと同じ理由である。
+    無い。5業態で47,626行が該当していた。
 
-    除去したこと自体は 備考 に残す。何をしたかの記録は要るが、作業を頼む
-    印とは別物なので、備考 と 要確認 で扱いを分ける。
+    元データの英語表記を採用しなかったことも理由にしない。name と
+    official_name はどちらも出ており、name:en と name:ja-Latn を足すかどうかは
+    欠陥の修正ではなく任意の追加になる。5業態で20,151行が該当していた。
+    採らなかった判断そのものは 備考 に残す。
 
-    立てるのは2つ。name が空の施設は、出力する名前そのものが無い。
-    英語表記があるのに name:en も name:ja-Latn も出せなかった施設は、
-    元データの値が何なのかを人が見ないと決められない。
+    何をしたかの記録は要るが、作業を頼む印とは別物なので、備考 と 要確認 で
+    扱いを分ける。mapping/facility_tags.csv の 確度=broader を build_osm.py の
+    needs_review から外したのと同じ考え方である。
     """
-    if not name:
-        return "yes"
-    if en and not name_en and not name_latn:
+    if not name.strip():
         return "yes"
     return ""
 
@@ -419,7 +422,7 @@ def main():
                     name_en = cleaned
                     stats["英語表記あり"] += 1
 
-            review = needs_review(name, en, name_en, name_latn)
+            review = needs_review(name)
             rows.append([fid, original, short, kana, en,
                          name, original, short, hira, name_en, name_latn,
                          review, " / ".join(notes)])

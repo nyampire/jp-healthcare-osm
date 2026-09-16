@@ -5,9 +5,10 @@
 立った行しかタスクにしないので、ここで立てるかどうかがそのまま
 作業者に届くかどうかになる。
 
-固定しているのは、運営主体を除去したことを理由にしない点である。
-除去した文字列は official_name に残り、operator も出していないため、
-作業者が現地で確かめる対象が無い。
+固定しているのは、出力に欠けが無い行で 要確認 を立てない点である。
+運営主体を除去した行は、除去した文字列が official_name に残り operator も
+出していない。元データの英語表記を採用しなかった行は、name と official_name
+がどちらも出ている。どちらも作業者が現地で確かめる対象が無い。
 """
 
 import os
@@ -19,22 +20,9 @@ from build_names import needs_review  # noqa: E402
 
 def main():
     cases = [
-        ("運営主体を除去しただけでは立てない",
-         needs_review("札幌厚生病院", "", "", ""), ""),
-        ("name が空なら立てる",
-         needs_review("", "", "", ""), "yes"),
-        ("英語表記があるのにどちらも出せなければ立てる",
-         needs_review("札幌厚生病院", "Sapporo Kosei Byoin", "", ""), "yes"),
-        ("英語表記から name:en を出せたら立てない",
-         needs_review("札幌厚生病院", "Sapporo Kosei Hospital",
-                      "Sapporo Kosei Hospital", ""), ""),
-        ("英語表記から name:ja-Latn を出せたら立てない",
-         needs_review("札幌厚生病院", "Sapporo Kosei Byoin",
-                      "", "Sapporo Kosei Byoin"), ""),
-        ("英語表記が無ければ立てない",
-         needs_review("札幌厚生病院", "", "", ""), ""),
-        ("name が空なら英語表記を出せていても立てる",
-         needs_review("", "Sapporo", "Sapporo", ""), "yes"),
+        ("name が空なら立てる", needs_review(""), "yes"),
+        ("空白だけの name も空として扱う", needs_review("  "), "yes"),
+        ("name があれば立てない", needs_review("札幌厚生病院"), ""),
     ]
 
     failed = 0
