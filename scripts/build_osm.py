@@ -212,6 +212,23 @@ def resolve_neighbourhood(g):
                 f"修正候補: {fix}")
 
 
+def hours_note(hr):
+    """診療時間で 要確認 が立った行の 備考 に積む1文を返す。
+
+    build_opening_hours.py は 備考 に処理の記録も書くが、そのうち作業者に
+    頼むことがある文だけを 要確認の理由 列に分けて入れている。休診日を
+    タグに入れ終えた記録は値が opening_hours の中にあるので写さない。
+
+    選り分けを備考の文面からやると、文言を書き換えたときに黙って外れる。
+    列で受け取るのはそのためである。
+
+    要確認の理由 の列が無い古い opening_hours.csv でも、何も返さずに動く。
+    """
+    if not (hr.get("要確認") or "").strip():
+        return ""
+    return (hr.get("要確認の理由") or "").strip()
+
+
 def number_note(g):
     """推定の番地を出さなかった行の 備考 に積む1文を返す。
 
@@ -445,6 +462,11 @@ def main():
         if why:
             notes.append(why)
             stat["opening_hours を短縮" if oh else "opening_hours を落とした"] += 1
+
+        hw = hours_note(hr)
+        if hw:
+            notes.append(hw)
+            stat["診療時間の理由を写した"] += 1
 
         # 推定の番地は出さない。台帳と突き合わせられた8,219件のうち番地が
         # 実在したのは33.9%で、街区符号が100を超える545件は0%だった。

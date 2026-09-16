@@ -18,8 +18,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_osm import (coord_note, emergency_tag, join_notes,  # noqa: E402
-                       needs_review, number_note, resolve_neighbourhood)
+from build_osm import (coord_note, emergency_tag, hours_note,  # noqa: E402
+                       join_notes, needs_review, number_note,
+                       resolve_neighbourhood)
 
 
 def main():
@@ -148,6 +149,22 @@ def main():
          number_note({}),
          "番地が推定のため addr:block_number と addr:housenumber を"
          "タグ出力していない"),
+    ]
+
+    # 診療時間の 要確認 の理由。build_opening_hours.py が 要確認の理由 列に
+    # 作業者に頼むことがある文だけを入れており、そのまま写す。
+    why = "opening_hours をタグ出力していない。営業日の金曜に時刻の記載が無い"
+    cases += [
+        ("要確認の理由をそのまま写す",
+         hours_note({"要確認": "yes", "要確認の理由": why}), why),
+        ("要確認が立っていなければ写さない",
+         hours_note({"要確認": "", "要確認の理由": why}), ""),
+        ("理由が空なら写さない",
+         hours_note({"要確認": "yes", "要確認の理由": ""}), ""),
+        ("要確認の理由の列が無くても止まらない",
+         hours_note({"要確認": "yes"}), ""),
+        ("診療時間の行そのものが無くても止まらない",
+         hours_note({}), ""),
     ]
 
     failed = 0

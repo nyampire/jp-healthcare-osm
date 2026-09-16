@@ -348,19 +348,63 @@ def nth_week_rules(row, idx, has_day, profile):
     return rules
 
 
+#: 休診日が無いことを表す記述。変換できなくても失われる情報が無い
+NO_CLOSURE_WORDS = {"", "なし", "無し", "ない", "無", "特になし", "年中無休",
+                    "。", "．", ".", "-", "ー", "―", "−"}
+
+
+def fold_closure_text(unparsed):
+    """期間名を拾うために表記差を畳む。
+
+    `年末・年始` `年末 年始` は `年末年始` と同じ休診期間だが、素の部分一致では
+    当たらない。区切りと `休み` `休診` を落としてから突き合わせる。
+    実データで313施設がこの差で拾えていなかった。
+    """
+    out = str(unparsed)
+    for ch in ("・", "，", ",", "、", " ", "　", "／", "/"):
+        out = out.replace(ch, "")
+    return out.replace("休み", "").replace("休診", "")
+
+
 def closure_comment(unparsed):
     """変換できなかった記述から、期間名だけを拾ってコメント文字列にする。
 
     opening_hours のコメントは機械判定されない表示用の情報なので、
     日付を特定できない GW・お盆等はここに退避する。
     """
+    folded = fold_closure_text(unparsed)
     found = []
     for needle, label in CLOSURE_KEYWORDS:
-        if needle in unparsed and label not in found:
+        if needle in folded and label not in found:
             found.append(label)
     if not found:
         return ""
     return "・".join(found) + "は休診"
+
+
+def needs_review_hours(excluded_n, conflict_n, opening_hours, unparsed, comment):
+    """作業者の確認が要る施設かどうかを決める。
+
+    立てるのは、出力に欠けがあるか、機械が判断を選んだ行である。
+
+    除外した時間帯がある行は opening_hours が実態より狭いかもしれない。
+    矛盾があった行は、営業曜日と時刻のどちらを採るかを機械が選んでいる。
+    opening_hours が空の行は、タグそのものが無い。
+
+    休診日の記述を変換できなかった行も立てる。ただし、期間名を拾って
+    コメントに退避できた行は除く。退避できた行では `|| off "お盆は休診"`
+    としてタグの中に残っており、作業者がやることが無い。
+    休診日が無いという記述も除く。失われた情報が無い。
+
+    実データでは、変換できなかった58,393施設のうち41,498施設がコメントに
+    退避でき、378施設が休診日の無い記述で、残る16,204施設だけが
+    どこにも残っていなかった。
+    """
+    if excluded_n or conflict_n or not opening_hours.strip():
+        return "yes"
+    if unparsed.strip() and not comment and unparsed.strip() not in NO_CLOSURE_WORDS:
+        return "yes"
+    return ""
 
 
 def load_facilities(path, profile):
@@ -607,10 +651,31 @@ def build_notes(fid, excluded_rows, overnight_n, conflict_rows, extra, decisions
 
     詳細は excluded.csv / conflicts.csv に全件あるが、突き合わせずに済むよう
     件数と代表例をここに残す。
+
+    返すのは (備考, 要確認の理由) の2つ。備考には処理の記録も含めて全部入れる。
+    要確認の理由には、作業者に頼むことがある文だけを入れる。
+
+    分ける理由は、OSM 側の 備考 に写すのが後者だけだからである。
+    休診日をタグに入れ終えた記録（定期週の休診、その他の休診日、コメントへの
+    退避、日跨ぎの採用）は、値がタグの中にあるので作業者がやることが無い。
+    2つを1本の文字列で持つと、写す側が文面の先頭で選り分けることになり、
+    文言を書き換えるたびに選り分けが黙って外れる。
     """
     notes = []
+    why = []
+
+    def record(text):
+        """処理の記録。備考にだけ入れる"""
+        notes.append(text)
+
+    def ask(text):
+        """作業者に頼むことがある文。両方に入れる"""
+        notes.append(text)
+        why.append(text)
+
     if overnight_n:
-        notes.append(f"日跨ぎとして採用 {overnight_n}件")
+        record(f"日跨ぎとして採用 {overnight_n}件")
+
     by_reason = collections.defaultdict(list)
     for r in excluded_rows:
         by_reason[r[6]].append(r)
@@ -618,13 +683,15 @@ def build_notes(fid, excluded_rows, overnight_n, conflict_rows, extra, decisions
         detail = "、".join(f"{r[1]} {r[4]} {r[5]}" for r in rows[:2])
         if len(rows) > 2:
             detail += f" 他{len(rows) - 2}件"
-        notes.append(f"除外 {len(rows)}件[{EXCLUSION_NOTE[reason]}]: {detail}")
+        ask(f"opening_hours から{len(rows)}件を除いた"
+            f"（{EXCLUSION_NOTE[reason]}）: {detail}")
+
     if extra.get("withheld"):
         days = "".join(r[3] for r in conflict_rows
                        if "出力しない" in decisions.get((fid, r[3]), ""))
-        notes.append(
-            f"opening_hours を出力しない: 曜日フラグが営業日とする{days}曜の時刻が無く、"
-            "書くと休診と誤解されるため")
+        ask("opening_hours をタグ出力していない。"
+            f"営業日の{days}曜に時刻の記載が無い")
+
     if conflict_rows:
         by_decision = collections.Counter(
             decisions.get((fid, r[3]), "判断なし") for r in conflict_rows)
@@ -632,16 +699,25 @@ def build_notes(fid, excluded_rows, overnight_n, conflict_rows, extra, decisions
             f"{k}×{n}" if n > 1 else k
             for k, n in by_decision.items() if "出力しない" not in k)
         if detail:
-            notes.append(f"曜日フラグと矛盾 {len(conflict_rows)}件 → {detail}")
+            ask(f"営業曜日と時刻が食い違う曜日が{len(conflict_rows)}件。{detail}")
+
     if extra.get("nth"):
-        notes.append("定期週の休診を反映: " + "、".join(extra["nth"]))
+        record("定期週の休診を反映: " + "、".join(extra["nth"]))
     if extra.get("dates"):
-        notes.append(f"その他の休診日から{extra['dates']}日を反映")
+        record(f"その他の休診日から{extra['dates']}日を反映")
     if extra.get("comment"):
-        notes.append(f"日付不明の休診期間をコメントに退避: {extra['comment']}")
+        record(f"日付不明の休診期間をコメントに退避: {extra['comment']}")
+
     if extra.get("unparsed"):
-        notes.append(f"未変換の休診日記述: {extra['unparsed'][:40]}")
-    return " / ".join(notes)
+        text = extra["unparsed"][:40]
+        if extra.get("comment") or text.strip() in NO_CLOSURE_WORDS:
+            # コメントに退避できた記述と、休診日が無いという記述。
+            # どちらも失われた情報が無いので作業を頼まない。
+            record(f"未変換の休診日記述: {text}")
+        else:
+            ask(f"休診日の記述「{text}」を opening_hours に変換できていない")
+
+    return " / ".join(notes), " / ".join(why)
 
 
 def resolve(base_dir, pattern):
@@ -702,17 +778,30 @@ def main():
     os.makedirs(build_dir, exist_ok=True)
     reports_dir = os.path.join(args.out_dir, "reports")
     os.makedirs(reports_dir, exist_ok=True)
+    def hours_row(fid, m):
+        note, why = build_notes(fid, exc_rows[fid], overnight[fid], con_rows[fid],
+                                applied.get(fid, {}), decisions)
+        # 元データに診療時間が1件も無い施設は、build_notes が書くことを持たない。
+        # タグが空であることと、その原因を作業者に伝える必要があるのでここで足す。
+        if not oh[fid] and "opening_hours をタグ出力していない" not in note:
+            missing = "opening_hours をタグ出力していない。元データに診療時間の記載が無い"
+            note = " / ".join([missing, note]) if note else missing
+            why = " / ".join([missing, why]) if why else missing
+        extra = applied.get(fid, {})
+        review = needs_review_hours(exc_by_fac[fid], con_by_fac[fid], oh[fid],
+                                    extra.get("unparsed", ""),
+                                    extra.get("comment", ""))
+        return [fid, m["name"], m["pref"], oh[fid], exc_by_fac[fid],
+                overnight[fid], con_by_fac[fid], review, note, why]
+
     write_csv(
         os.path.join(build_dir, f"{args.sector}_opening_hours.csv"),
         ["ID", "正式名称", "都道府県コード", "opening_hours",
-         "除外区間数", "日跨ぎ採用数", "矛盾曜日数", "要確認", "備考"],
-        [[fid, m["name"], m["pref"], oh[fid], exc_by_fac[fid], overnight[fid],
-          con_by_fac[fid],
-          "yes" if (exc_by_fac[fid] or con_by_fac[fid] or not oh[fid]) else "",
-          build_notes(fid, exc_rows[fid], overnight[fid], con_rows[fid],
-                      applied.get(fid, {}), decisions)
-          or ("01-2に有効な診療時間がない" if not oh[fid] else "")]
-         for fid, m in fac.items()])
+         "除外区間数", "日跨ぎ採用数", "矛盾曜日数", "要確認", "備考",
+         # 備考 のうち作業者に頼むことがある文だけ。build_osm.py が
+         # OSM 側の 備考 に写す。列は末尾に足す。
+         "要確認の理由"],
+        [hours_row(fid, m) for fid, m in fac.items()])
 
     write_csv(
         os.path.join(reports_dir, f"{args.sector}_excluded.csv"),
