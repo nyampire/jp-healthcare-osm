@@ -58,13 +58,14 @@ def main():
     # 修正候補は行ごとに違うので join_notes の specific 側に入り、
     # MapRoulette の200文字で切られても先頭に残る。
     cases += [
-        ("修正候補があれば addr:neighbourhood を出さない",
+        ("修正候補があれば addr:neighbourhood をタグ出力しない",
          resolve_neighbourhood({"addr:neighbourhood": "鶴見町",
                                 "町字の修正候補": "鶴見中央"})[0], ""),
         ("修正候補があれば備考に候補を書く",
          resolve_neighbourhood({"addr:neighbourhood": "鶴見町",
                                 "町字の修正候補": "鶴見中央"})[1],
-         "町字が入力と別のものになったため addr:neighbourhood を出さない。"
+         "町字が入力と別のものになったため addr:neighbourhood を"
+          "タグ出力していない。"
          "修正候補: 鶴見中央"),
         ("修正候補が無ければ町字をそのまま出す",
          resolve_neighbourhood({"addr:neighbourhood": "生麦一丁目",
@@ -130,19 +131,23 @@ def main():
     cases += [
         ("地番と分かった行は地番のためと書く",
          number_note({"番地の判定": "地番"}),
-         "地番のため addr:block_number と addr:housenumber を出さない"),
+         "地番のため addr:block_number と addr:housenumber を"
+         "タグ出力していない"),
         ("どちらの明細にも無い行は見つからないと書く",
          number_note({"番地の判定": "不一致"}),
-         "番地が住居表示にも地番にも見つからないため出さない"),
+         "番地が住居表示にも地番にも見つからないため "
+         "addr:block_number と addr:housenumber をタグ出力していない"),
         ("照合できない行は明細が無いと書く",
          number_note({"番地の判定": "判定不能"}),
-         "照合する明細が無いため番地を出さない"),
+         "対応する住居表示レコードが無いため番地をタグ出力していない"),
         ("判定が空なら推定のためと書く",
          number_note({"番地の判定": ""}),
-         "番地が推定のため addr:block_number と addr:housenumber を出さない"),
+         "番地が推定のため addr:block_number と addr:housenumber を"
+         "タグ出力していない"),
         ("番地の判定の列が無くても止まらない",
          number_note({}),
-         "番地が推定のため addr:block_number と addr:housenumber を出さない"),
+         "番地が推定のため addr:block_number と addr:housenumber を"
+         "タグ出力していない"),
     ]
 
     failed = 0

@@ -130,7 +130,7 @@ def clean_url(value):
     if m:
         return f"{m.group(1)}://{m.group(2)}", f"コロンの脱字を補った: {v[:60]}"
     if RE_BARE_DOMAIN.match(v):
-        return f"https://{v}", f"スキームが無いため https を補った: {v[:60]}"
+        return f"https://{v}", f"website に https を補った: {v[:60]}"
     return "", f"website に使えない形式のため出力しない: {v[:60]}"
 
 
@@ -207,7 +207,8 @@ def resolve_neighbourhood(g):
     fix = (g.get("町字の修正候補") or "").strip()
     if not fix:
         return g.get("addr:neighbourhood", ""), ""
-    return "", ("町字が入力と別のものになったため addr:neighbourhood を出さない。"
+    return "", ("町字が入力と別のものになったため addr:neighbourhood を"
+                "タグ出力していない。"
                 f"修正候補: {fix}")
 
 
@@ -228,12 +229,15 @@ def number_note(g):
     """
     judge = (g.get("番地の判定") or "").strip()
     if judge == "地番":
-        return "地番のため addr:block_number と addr:housenumber を出さない"
+        return ("地番のため addr:block_number と addr:housenumber を"
+                "タグ出力していない")
     if judge == "不一致":
-        return "番地が住居表示にも地番にも見つからないため出さない"
+        return ("番地が住居表示にも地番にも見つからないため "
+                "addr:block_number と addr:housenumber をタグ出力していない")
     if judge == "判定不能":
-        return "照合する明細が無いため番地を出さない"
-    return "番地が推定のため addr:block_number と addr:housenumber を出さない"
+        return "対応する住居表示レコードが無いため番地をタグ出力していない"
+    return ("番地が推定のため addr:block_number と addr:housenumber を"
+            "タグ出力していない")
 
 
 def needs_review(nm, hr, g, town_why, housenumber_dropped):
