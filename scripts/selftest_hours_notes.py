@@ -12,14 +12,23 @@
 
 3. build_notes が、作業者に頼むことがある文と、処理の記録である文を
    分けて返すこと。OSM 側の 備考 には前者だけを写す。
+
+4. 時刻不明の営業日を持つ施設で、unknown として出した場合と、出力を
+   見送った場合とで、別の文を返すこと。どちらも作業者に頼むことがある。
+
+5. resolve_conflicts が、平日に時刻が1つも無い施設を unknown で出さないこと。
+   祝日だけ時刻を持つ施設を unknown で出すと、通常の週に一度も開かない
+   式になる。
 """
 
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_opening_hours import (build_notes, closure_comment,  # noqa: E402
-                                 needs_review_hours)
+from build_opening_hours import (DECISION_UNKNOWN,  # noqa: E402
+                                 DECISION_WITHHOLD, build_notes,
+                                 closure_comment, needs_review_hours,
+                                 resolve_conflicts)
 
 
 def main():
@@ -73,6 +82,40 @@ def main():
     note3, why3 = build_notes("1", [], 4, [], {"dates": 2}, {})
     eq("日跨ぎと休診日の反映だけなら理由は空", why3, "")
     eq("それでも備考には残る", "日跨ぎとして採用 4件" in note3, True)
+
+    # 4. 時刻不明の営業日
+    con = [["1", "n", "01", "月", "1(診療)", "なし", "曜日フラグは営業日だが時刻が無い"]]
+    note4, why4 = build_notes("1", [], 0, con, {"unknown": ["月"]},
+                              {("1", "月"): DECISION_UNKNOWN})
+    eq("unknown にした曜日を理由に書く",
+       why4, "営業日の月曜に時刻の記載が無いため opening_hours に unknown と書いた")
+    eq("unknown の曜日を矛盾の一覧に重ねない",
+       "営業曜日と時刻が食い違う" in note4, False)
+
+    note5, why5 = build_notes("1", [], 0, con, {"withheld": True},
+                              {("1", "月"): DECISION_WITHHOLD})
+    eq("全営業日が時刻不明なら出力しない旨を書く",
+       why5, "opening_hours をタグ出力していない。営業日の月曜に時刻の記載が無い")
+    eq("見送った曜日も矛盾の一覧に重ねない",
+       "営業曜日と時刻が食い違う" in note5, False)
+
+    # 5. unknown で出すか、出力を見送るか
+    def fac_of(open_days, ph_open=False):
+        return {"f": {"closed": {d: ("1" if d in open_days else "0")
+                                 for d in "月火水木金土日"},
+                      "ph": "0" if ph_open else "1"}}
+
+    _, wh1, unk1 = resolve_conflicts({("f", "火"): [(540, 1080)]},
+                                     fac_of("月火"))
+    eq("平日に時刻があれば unknown で残す", (sorted(wh1), unk1),
+       ([], {"f": ["月"]}))
+
+    _, wh2, unk2 = resolve_conflicts({("f", "祝"): [(540, 1080)]},
+                                     fac_of("月火", ph_open=True))
+    eq("祝日だけなら出力を見送る", (sorted(wh2), unk2), (["f"], {}))
+
+    _, wh3, unk3 = resolve_conflicts({}, fac_of("月火"))
+    eq("時刻が1つも無ければ出力を見送る", (sorted(wh3), unk3), (["f"], {}))
 
     failed = 0
     print("=== build_opening_hours.py 備考と要確認 逆テスト ===\n")

@@ -134,6 +134,12 @@ EMERGENCY_CODES = {"09010"}
 OUTPATIENT_EARLIEST = 6 * 60    # 06:00
 OUTPATIENT_LATEST = 23 * 60     # 23:00
 
+# 営業日フラグが立っているのに時刻が無い曜日の扱い。decisions に入れる値で、
+# build_notes はこの2つを見て文を選ぶ。どちらも専用の文を持つので、
+# 矛盾曜日の一覧には重ねない。
+DECISION_UNKNOWN = "unknown として出力（時刻不明の営業日）"
+DECISION_WITHHOLD = "opening_hours を出力しない（時刻不明の営業日がある）"
+
 # 終了が開始より前の区間は日跨ぎ（当直帯）として採用する。ただし継続時間がこれを
 # 超えるものは夜勤ではなく打ち間違いとみなす。実データでは 15〜16時間に 188 件が
 # 集中する一方、20時間超の 11 件はいずれも終了が開始の直前にある誤入力だった。
@@ -519,12 +525,14 @@ def merge(ivs):
     return out
 
 
-def build_opening_hours(intervals, fac, profile, withheld=frozenset()):
+def build_opening_hours(intervals, fac, profile, withheld=frozenset(),
+                        unknown_days=None):
     """01-2 の診療時間を基本ルールとし、01-1 の例外ルールを後ろに重ねる。
 
     opening_hours は後ろのルールが前を上書きするため、
     「基本時間 → 定期週の休診 → 祝日 → 特定日の休診」の順に並べる。
     """
+    unknown_days = unknown_days or {}
     results = {}
     applied = {}
     for fid, meta in fac.items():
@@ -551,6 +559,13 @@ def build_opening_hours(intervals, fac, profile, withheld=frozenset()):
             grp.setdefault(t, []).append(d)
         rules = [f"{','.join(ds)} {t}" for t, ds in grp.items()]
 
+        # 時刻の分からない営業日。時刻の規則の直後に置き、定期週の休診や
+        # 特定日の休診には上書きさせる。これらの曜日は時刻を持たないので
+        # nth_week_rules の対象にもならない。
+        unk = unknown_days.get(fid)
+        if unk:
+            rules.append(f"{','.join(OSM_DAY[d] for d in unk)} unknown")
+
         nth = nth_week_rules(meta["row"], meta["idx"],
                              lambda d: bool(intervals.get((fid, d))), profile)
         rules += nth
@@ -575,7 +590,8 @@ def build_opening_hours(intervals, fac, profile, withheld=frozenset()):
         applied[fid] = {"nth": nth, "ph": ph,
                         "dates": len(meta["closed_dates"]),
                         "unparsed": meta["unparsed"],
-                        "comment": comment}
+                        "comment": comment,
+                        "unknown": unk}
     return results, applied
 
 
@@ -594,12 +610,14 @@ def resolve_conflicts(intervals, fac):
 
     B) 01-1 が診療日と言う曜日に 01-2 が時刻を持たない:
        これは矛盾ではなく 01-2 の記入漏れで、休診を意味しない。
-       opening_hours には「開いているが時刻不明」を表す構文が無いため、
-       その曜日を書かなければ休診と誤解される。誤情報を出さないよう、
-       施設単位で opening_hours の出力自体を見送る。
+       その曜日を書かずに省くと休診と読まれるため、opening_hours の
+       `unknown` を使って状態を明示しないまま残し、時刻の分かっている
+       曜日はそのまま出す。平日に時刻の分かる曜日が1つも無い施設は、
+       unknown だけの式になって一度も開かないため、従来どおり見送る。
     """
     decisions = {}
     withheld = set()
+    unknown_days = {}
     for fid, meta in fac.items():
         # 01-1 が診療日と明示している曜日の時刻集合を、比較の基準にする
         baseline = set()
@@ -623,10 +641,17 @@ def resolve_conflicts(intervals, fac):
         missing = [d for d in DAYS
                    if meta["closed"][d] == "1" and not intervals.get((fid, d))]
         if missing:
-            withheld.add(fid)
-            for d in missing:
-                decisions[(fid, d)] = "opening_hours を出力しない（時刻不明の営業日がある）"
-    return decisions, withheld
+            # 祝日は数えない。祝日だけ時刻を持つ施設を unknown で出すと
+            # 平日が全て unknown になり、通常の週に一度も開かない式になる。
+            if any(intervals.get((fid, d)) for d in DAYS):
+                unknown_days[fid] = missing
+                for d in missing:
+                    decisions[(fid, d)] = DECISION_UNKNOWN
+            else:
+                withheld.add(fid)
+                for d in missing:
+                    decisions[(fid, d)] = DECISION_WITHHOLD
+    return decisions, withheld, unknown_days
 
 
 def find_conflicts(intervals, fac):
@@ -686,18 +711,24 @@ def build_notes(fid, excluded_rows, overnight_n, conflict_rows, extra, decisions
         ask(f"opening_hours から{len(rows)}件を除いた"
             f"（{EXCLUSION_NOTE[reason]}）: {detail}")
 
+    def days_with(decision):
+        return "".join(r[3] for r in conflict_rows
+                       if decisions.get((fid, r[3]), "") == decision)
+
     if extra.get("withheld"):
-        days = "".join(r[3] for r in conflict_rows
-                       if "出力しない" in decisions.get((fid, r[3]), ""))
         ask("opening_hours をタグ出力していない。"
-            f"営業日の{days}曜に時刻の記載が無い")
+            f"営業日の{days_with(DECISION_WITHHOLD)}曜に時刻の記載が無い")
+    elif extra.get("unknown"):
+        ask(f"営業日の{days_with(DECISION_UNKNOWN)}曜に時刻の記載が無いため "
+            "opening_hours に unknown と書いた")
 
     if conflict_rows:
         by_decision = collections.Counter(
             decisions.get((fid, r[3]), "判断なし") for r in conflict_rows)
         detail = "、".join(
             f"{k}×{n}" if n > 1 else k
-            for k, n in by_decision.items() if "出力しない" not in k)
+            for k, n in by_decision.items()
+            if k not in (DECISION_WITHHOLD, DECISION_UNKNOWN))
         if detail:
             ask(f"営業曜日と時刻が食い違う曜日が{len(conflict_rows)}件。{detail}")
 
@@ -759,8 +790,9 @@ def main():
         intervals, emergency, excluded, overnight = load_intervals(f2)
     # 矛盾の検出は解消前の状態で行い、そのあと intervals を書き換える
     conflicts = find_conflicts(intervals, fac)
-    decisions, withheld = resolve_conflicts(intervals, fac)
-    oh, applied = build_opening_hours(intervals, fac, profile, withheld)
+    decisions, withheld, unknown_days = resolve_conflicts(intervals, fac)
+    oh, applied = build_opening_hours(intervals, fac, profile, withheld,
+                                      unknown_days)
 
     exc_by_fac = collections.Counter(r[0] for r in excluded)
     con_by_fac = collections.Counter(r[0] for r in conflicts)
