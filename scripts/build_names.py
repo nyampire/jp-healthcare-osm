@@ -141,6 +141,24 @@ def load_facility_words(path):
     return sorted(vals, key=len, reverse=True)
 
 
+def load_operator_words(path):
+    """先頭に来たら運営主体とみなす語。略称に残っていても落とす。
+
+    `国民健康保険` や `市立` は保険者や設置者を表す語で、施設が略称でも
+    名乗っていることがある。略称を根拠に残すと、施設名ではない語が name に
+    入るため、略称の照合より先に判定する。
+    """
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return [r["語"].strip() for r in csv.DictReader(f) if r["語"].strip()]
+
+
+def load_speciality_words(path):
+    """診療科そのものの語。先頭に来たら施設名ではない。"""
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return {r["診療科目名(最頻)"].strip() for r in csv.DictReader(f)
+                if r["診療科目名(最頻)"].strip()}
+
+
 def load_suffixes(path):
     with open(path, encoding="utf-8-sig", newline="") as f:
         return [r["接尾辞"].strip() for r in csv.DictReader(f) if r["接尾辞"].strip()]
@@ -218,16 +236,29 @@ def to_hiragana(s):
     return "".join(KATA_TO_HIRA.get(c, c) for c in s)
 
 
+def _squash(value):
+    """空白を除いて突き合わせる。元データは全角と半角の空白が混在する。"""
+    return (value or "").replace("\u3000", "").replace(" ", "").strip()
+
+
 def is_facility(token, facility_words):
     return any(token.endswith(w) for w in facility_words)
 
 
-def strip_entity(name, prefixes, suffixes, facility_words):
+def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
+                 speciality_words=frozenset(), operator_words=()):
     """先頭から運営主体と識別できるトークンだけを取り除く。
 
-    戻り値は (施設名, 取り除いた文字列のリスト)。識別できない場合は元のまま返す。
+    戻り値は (施設名, 取り除いた文字列のリスト, 推定で落とした文字列のリスト)。
+    識別できない場合は元のまま返す。
+
+    3つ目は、法人格でも法人名の接尾辞でもなく、施設種別語の位置から運営主体と
+    推定して落としたものである。この推定は外れることがあり、外れた行では
+    `楠井　歯科` が `歯科` になる。正しいかどうかは元データだけでは決まらないので、
+    呼び出し側で作業者に確かめてもらう印に使う。
     """
     removed = []
+    guessed = []
     rest = name
 
     # 1) 空白を挟まずに法人格が前置されている場合（例: 医療法人社団明和会中村病院）
@@ -258,7 +289,18 @@ def strip_entity(name, prefixes, suffixes, facility_words):
         #     `オアシス ファーマシー` は末尾が施設種別語でないので保護される。
         if (not is_facility(head, facility_words)
                 and is_facility(tail.split(" ")[-1], facility_words)):
+            # 診療科そのものと運営主体の語は、略称に残っていても落とす。
+            if head in speciality_words or any(w in head for w in operator_words):
+                removed.append(head)
+                guessed.append(head)
+                rest = tail
+                continue
+            # 元データの略称が「この語 + 残り」なら、施設が自ら名乗っている
+            # 名前の一部であって運営主体ではない。落とさずにここで止める。
+            if short_name and _squash(short_name) == _squash(head) + _squash(tail):
+                break
             removed.append(head)
+            guessed.append(head)
             rest = tail
             continue
         break
@@ -280,7 +322,7 @@ def strip_entity(name, prefixes, suffixes, facility_words):
         if rest.startswith(token) and len(rest) > len(token):
             removed.append(token)
             rest = rest[len(token):].strip()
-    return rest, removed
+    return rest, removed, guessed
 
 
 # 英語表記に紛れる中黒。ASCII に収めるため空白へ寄せる。
@@ -309,7 +351,7 @@ def resolve(base, pattern):
 
 
 
-def needs_review(name):
+def needs_review(name, why=""):
     """作業者の確認が要る施設かどうかを決める。
 
     立てるのは name が空の施設だけである。出力する名前そのものが無いので、
@@ -329,8 +371,15 @@ def needs_review(name):
     何をしたかの記録は要るが、作業を頼む印とは別物なので、備考 と 要確認 で
     扱いを分ける。mapping/facility_tags.csv の 確度=broader を build_osm.py の
     needs_review から外したのと同じ考え方である。
+
+    先頭トークンを運営主体と推定して落とした行は理由にする。落とした語は
+    行ごとに違い、推定が正しいかは元データだけでは決まらない。外れた行では
+    施設名そのものが name から欠ける。official_name と short_name に元の形が
+    残るので、作業者はその2つと見比べて直せる。
     """
     if not name.strip():
+        return "yes"
+    if why.strip():
         return "yes"
     return ""
 
@@ -344,6 +393,10 @@ def main():
     p.add_argument("--suffixes", default=os.path.join("mapping", "name_entity_suffixes.csv"))
     p.add_argument("--facility-words",
                    default=os.path.join("mapping", "name_facility_words.csv"))
+    p.add_argument("--operator-words",
+                   default=os.path.join("mapping", "name_operator_words.csv"))
+    p.add_argument("--speciality",
+                   default=os.path.join("mapping", "speciality_mapping.csv"))
     args = p.parse_args()
 
     label, pattern, col_name, col_short, col_kana, col_en = SECTORS[args.sector]
@@ -351,6 +404,8 @@ def main():
     prefixes = load_prefixes(args.prefixes)
     suffixes = load_suffixes(args.suffixes)
     facility_words = load_facility_words(args.facility_words)
+    operator_words = load_operator_words(args.operator_words)
+    speciality_words = load_speciality_words(args.speciality)
     print(f"業態     : {label}")
     print(f"施設票   : {os.path.basename(src)}")
 
@@ -369,8 +424,9 @@ def main():
             en = row[idx[col_en]].strip() if col_en else ""
 
             normalized = normalize_chars(original)
-            name, removed = strip_entity(normalized, prefixes, suffixes,
-                                         facility_words)
+            name, removed, guessed = strip_entity(
+                normalized, prefixes, suffixes, facility_words,
+                short, speciality_words, operator_words)
             for x in removed:
                 removed_use[x] += 1
 
@@ -422,10 +478,17 @@ def main():
                     name_en = cleaned
                     stats["英語表記あり"] += 1
 
-            review = needs_review(name)
+            why = ""
+            if guessed:
+                why = ("名称の先頭の「" + "」「".join(guessed)
+                       + "」を運営主体とみなして name から除いた。"
+                       "official_name と short_name で確かめてください")
+            if why:
+                notes.append(why)
+            review = needs_review(name, why)
             rows.append([fid, original, short, kana, en,
                          name, original, short, hira, name_en, name_latn,
-                         review, " / ".join(notes)])
+                         review, " / ".join(notes), why])
             stats["施設"] += 1
             if review:
                 stats["要確認"] += 1
@@ -438,7 +501,8 @@ def main():
         w.writerow(["ID",
                     f"元_{col_name}", "元_略称", "元_フリガナ", "元_英語表記",
                     "name", "official_name", "short_name", "name:ja-Hira",
-                    "name:en", "name:ja-Latn", "要確認", "備考"])
+                    "name:en", "name:ja-Latn", "要確認", "備考",
+                    "要確認の理由"])
         w.writerows(rows)
 
     print()

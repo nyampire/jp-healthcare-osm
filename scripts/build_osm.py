@@ -212,6 +212,21 @@ def resolve_neighbourhood(g):
                 f"修正候補: {fix}")
 
 
+def name_note(nm):
+    """名称で 要確認 が立った行の 備考 に積む1文を返す。
+
+    build_names.py は 備考 に処理の記録も書くが、そのうち作業者に頼むことが
+    ある文だけを 要確認の理由 列に分けて入れている。法人格を除いた記録は
+    診療所の全行に同じ形で当てはまるので写さない。写すのは、先頭トークンを
+    運営主体と推定して落とした行だけである。
+
+    要確認の理由 の列が無い古い names.csv でも、何も返さずに動く。
+    """
+    if not (nm.get("要確認") or "").strip():
+        return ""
+    return (nm.get("要確認の理由") or "").strip()
+
+
 def hours_note(hr):
     """診療時間で 要確認 が立った行の 備考 に積む1文を返す。
 
@@ -462,6 +477,11 @@ def main():
         if why:
             notes.append(why)
             stat["opening_hours を短縮" if oh else "opening_hours を落とした"] += 1
+
+        nw = name_note(nm)
+        if nw:
+            notes.append(nw)
+            stat["名称の理由を写した"] += 1
 
         hw = hours_note(hr)
         if hw:
