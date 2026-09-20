@@ -241,6 +241,39 @@ def _squash(value):
     return (value or "").replace("\u3000", "").replace(" ", "").strip()
 
 
+# 法人名の接尾辞の直後にこの文字が来るときは、そこで語が切れていない。
+# `岸和田市医師会館` の `会館`、`DIC株式会社小牧工場診療所` の `会社`、
+# `肝属郡医師会立病院` の `会立`、`小松会営薬局` の `会営`、
+# `ヤマグチ薬局六会店` の `会店` が該当する。
+SUFFIX_CONTINUES = "館社立営店"
+
+# 法人名を取り去った後に先頭へ残る空白と記号。`(社団)児玉医院` の閉じ括弧など。
+LEADING_NOISE = re.compile(r"^[\s\u3000)\]）】」』＞>》・,、.。／/－-]+")
+
+
+def entity_head(rest, suffixes, limit=10):
+    """先頭から法人名の接尾辞で終わる最短の語を返す。無ければ空文字。
+
+    最長の語を返すと `社会医療法人孝仁会札幌孝仁会記念病院` が `記念病院` に
+    なる。法人名と同じ語が施設名にも入る形が多く、後ろ側まで落ちてしまう。
+
+    接尾辞そのものより長い語だけを返す。`会田医院` の1文字目のように、
+    施設名の先頭がたまたま接尾辞と同じ文字で始まる場合に切らないためである。
+    """
+    for i in range(1, min(len(rest), limit) + 1):
+        nxt = rest[i:i + 1]
+        if not nxt or nxt in SUFFIX_CONTINUES:
+            continue
+        head = rest[:i]
+        # 空白をまたぐ語は返さない。`コスモ調剤薬局 会津店` の `会` を切れ目と
+        # みなすと、地名の `会津` が `津` だけになる。空白区切りは段2が扱う。
+        if " " in head or "\u3000" in head:
+            break
+        if any(head.endswith(s) and len(head) > len(s) for s in suffixes):
+            return head
+    return ""
+
+
 def is_facility(token, facility_words):
     return any(token.endswith(w) for w in facility_words)
 
@@ -259,6 +292,7 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
     """
     removed = []
     guessed = []
+    had_prefix = False
     rest = name
 
     # 1) 空白を挟まずに法人格が前置されている場合（例: 医療法人社団明和会中村病院）
@@ -270,6 +304,7 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
                 removed.append(p)
                 rest = rest[len(p):].strip()
                 changed = True
+                had_prefix = True
                 break
 
     # 2) 空白区切りのトークン列を先頭から見て、運営主体と識別できる分だけ落とす。
@@ -315,6 +350,7 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
                 removed.append(pfx)
                 rest = rest[len(pfx):].strip()
                 changed = True
+                had_prefix = True
                 break
 
     # 4) 法人格を落とした結果 `社団` `財団` だけが残った場合に続けて落とす
@@ -322,6 +358,39 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
         if rest.startswith(token) and len(rest) > len(token):
             removed.append(token)
             rest = rest[len(token):].strip()
+
+    # 5) 空白を挟まずに法人名が前置されている場合（例: 特定医療法人仁泉会朝倉病院）。
+    #    段2の接尾辞の判定は空白区切りのトークンしか見ないので、ここで当てる。
+    #    `恩賜財団済生会支部北海道済生会小樽病院` のように法人名が重なる例が
+    #    あるので、落とせなくなるまで繰り返す。
+    #    法人格を落とした行だけを対象にする。法人格が無い行にも当てると、
+    #    `コスモ調剤薬局 会津店` や `ヤマグチ薬局六会店` の地名が削れる。
+    before = rest
+    while had_prefix:
+        head = entity_head(rest, suffixes)
+        if not head:
+            break
+        tail = LEADING_NOISE.sub("", rest[len(head):])
+        if not tail:
+            break
+        # 元データの略称が「この語 + 残り」なら、施設が自ら名乗っている名前の
+        # 一部であって運営主体ではない。段2b と同じ判定である。
+        if _squash(short_name) == _squash(head) + _squash(tail):
+            break
+        # 施設種別語や診療科だけが残ると、どの施設を指すか分からなくなる。
+        # `日本相撲協会診療所` が `診療所` に、`六会眼科` が `眼科` になる。
+        if tail in facility_words or tail in speciality_words:
+            break
+        # 何に附属するかが消える。`岩手県予防医学協会附属診療所` が
+        # `附属診療所` になる。
+        if tail.startswith(("附属", "付属")):
+            break
+        removed.append(head)
+        rest = tail
+    # 続けて落とした語は元の文字列で隣り合っている。`北海道社会` `事業協会` と
+    # 分けて記録すると実在しない語が並ぶので、落とした範囲を1つにまとめる。
+    if rest != before:
+        guessed.append(before[:len(before) - len(rest)])
     return rest, removed, guessed
 
 
