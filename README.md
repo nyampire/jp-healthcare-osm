@@ -62,7 +62,6 @@ export NJA_API_BASE=/path/to/japanese-addresses-v2/out/api/ja
 | `amenity` | 助産所以外 | 194,872 |
 | `healthcare` | 全業態 | 196,680 |
 | `name` / `official_name` | 全業態 | 196,680 |
-| `short_name` | 略称のある業態 | 95,231 |
 | `name:ja-Hira` | 全業態 | 150,774 |
 | `name:ja-Latn` | 全業態 | 76,199 |
 | `name:en` | 全業態 | 81,589 |

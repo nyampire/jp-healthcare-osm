@@ -44,7 +44,7 @@ SECTORS = {
 }
 
 # タスクに載せるタグ。この順で properties に入る。
-TAG_KEYS = ["amenity", "healthcare", "name", "official_name", "short_name",
+TAG_KEYS = ["amenity", "healthcare", "name", "official_name",
             "name:ja-Hira", "name:ja-Latn", "name:en", "opening_hours",
             "healthcare:speciality", "website", "addr:full", "beds", "source"]
 

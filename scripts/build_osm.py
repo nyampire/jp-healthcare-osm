@@ -513,7 +513,6 @@ def main():
             "healthcare": ft["healthcare"].strip(),
             "name": nm.get("name", ""),
             "official_name": nm.get("official_name", ""),
-            "short_name": nm.get("short_name", ""),
             "name:ja-Hira": nm.get("name:ja-Hira", ""),
             "name:ja-Latn": nm.get("name:ja-Latn", ""),
             "name:en": nm.get("name:en", ""),
@@ -553,7 +552,10 @@ def main():
         })
         stat["出力"] += 1
 
-    keys = ["amenity", "healthcare", "name", "official_name", "short_name",
+    # short_name は出さない。元データの 略称 は届出の記載で、OSM の
+    # short_name が求める「通用している短い名前」と一致するか確かめられない。
+    # 判定には使い続けるが、値は 要確認の理由 の文の中だけに出す。
+    keys = ["amenity", "healthcare", "name", "official_name",
             "name:ja-Hira", "name:ja-Latn", "name:en", "opening_hours",
             "healthcare:speciality", "emergency", "website", "addr:full",
             "addr:country", "addr:province", "addr:county", "addr:city",
