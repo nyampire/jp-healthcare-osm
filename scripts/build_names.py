@@ -291,6 +291,52 @@ def is_facility(token, facility_words):
     return any(token.endswith(w) for w in facility_words)
 
 
+def looks_like_facility(value, facility_words, speciality_words):
+    """施設名らしく終わっているかを返す。
+
+    施設種別語（`クリニック` `病院` など）か診療科名（`整形外科` など）で
+    終わっていれば、施設を指す名前とみなす。`明雪会` のような法人名は
+    どちらでも終わらない。
+    """
+    v = _squash(value)
+    if not v:
+        return False
+    return (any(v.endswith(w) for w in facility_words)
+            or any(v.endswith(w) for w in speciality_words))
+
+
+def has_facility_word(value, facility_words, speciality_words):
+    """施設種別語か診療科名を1つでも含むかを返す。
+
+    末尾だけを見ると `宇梶歯科医院本院` や `レーベンデンタルクリニック稲城` を
+    施設名でないと判定する。分院名や地名で終わる施設名が多いので、名前の
+    どこかに施設種別語か診療科名があれば施設名とみなす。
+    """
+    v = _squash(value)
+    if not v:
+        return False
+    return (any(w in v for w in facility_words)
+            or any(w in v for w in speciality_words))
+
+
+def use_short_name(name, short_name, facility_words, speciality_words):
+    """正式名称に法人名しか入っていない施設かどうかを返す。
+
+    元データの 正式名称 が `医療法人明雪会` のように法人名だけで終わり、
+    施設名は 略称 の `環状通東整形外科` にしかない行がある。この形では
+    法人格を落としても name が施設を指さないので、略称 を name に使う。
+
+    name が施設種別語も診療科名も含まなければ、施設名が入っていないと判断する。
+    `竹内外科胃腸科` のように診療科名を含む名前は、正式名称に施設名があるので
+    使わない。name が 略称 に含まれる場合も、同じ名前の言い換えなので使わない。
+    """
+    if has_facility_word(name, facility_words, speciality_words):
+        return False
+    if not looks_like_facility(short_name, facility_words, speciality_words):
+        return False
+    return _squash(name) not in _squash(short_name)
+
+
 def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
                  speciality_words=frozenset(), operator_words=(),
                  anywhere_words=()):
@@ -530,6 +576,21 @@ def main():
             name, removed, guessed = strip_entity(
                 normalized, prefixes, suffixes, facility_words,
                 short, speciality_words, operator_words, anywhere_words)
+            # 正式名称に法人名しか入っていない施設は、略称 を name に使う。
+            # 法人格を落とした行だけを対象にする。法人格が無い名称は届出の
+            # 表記ゆれであって、法人名だけになっている形とは別である。
+            used_short = (any(x in prefixes for x in removed)
+                          and use_short_name(name, short, facility_words,
+                                             speciality_words))
+            if used_short:
+                alt = strip_entity(
+                    normalize_chars(short), prefixes, suffixes, facility_words,
+                    "", speciality_words, operator_words, anywhere_words)[0]
+                if looks_like_facility(alt, facility_words, speciality_words):
+                    name = alt
+                else:
+                    used_short = False
+
             for x in removed:
                 removed_use[x] += 1
 
@@ -544,7 +605,7 @@ def main():
             # フリガナは運営主体を含む読みなので、name を削った施設では対応しない
             hira = ""
             if kana:
-                if removed:
+                if removed or used_short:
                     notes.append("フリガナが運営主体を含み name と対応しないため name:ja-Hira は出力しない")
                     stats["読み不一致"] += 1
                 else:
@@ -585,6 +646,10 @@ def main():
             if guessed:
                 why = ("名称の先頭の「" + "」「".join(guessed)
                        + "」を運営主体とみなして name から除いた。"
+                       "official_name と short_name で確かめてください")
+            if used_short:
+                why = ("正式名称が法人名で終わり施設名を含まないため、"
+                       "name に short_name を使った。"
                        "official_name と short_name で確かめてください")
             if why:
                 notes.append(why)

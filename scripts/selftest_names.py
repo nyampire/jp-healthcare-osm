@@ -15,7 +15,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_names import needs_review, strip_entity  # noqa: E402
+from build_names import (needs_review, strip_entity,  # noqa: E402
+                         looks_like_facility, use_short_name)
 
 PFX = ["医療法人社団", "医療法人"]
 SUF = ["会", "機構", "社団"]
@@ -123,6 +124,31 @@ def main():
     eq("落とした後の空白を詰める",
        strip("下北医療センター 国民健康保険 大畑診療所"),
        ("下北医療センター 大畑診療所", ["国民健康保険"], []))
+
+    # 正式名称に法人名しか入っていない施設。施設名は略称にしかない。
+    def fac(v):
+        return looks_like_facility(v, FW, SPEC)
+
+    def useshort(name, short):
+        return use_short_name(name, short, FW, SPEC)
+
+    eq("診療科で終われば施設名とみなす", fac("環状通東整形外科"), True)
+    eq("会で終われば施設名とみなさない", fac("明雪会"), False)
+    eq("空文字は施設名とみなさない", fac(""), False)
+    eq("正式名称が法人名だけなら略称を使う",
+       useshort("明雪会", "環状通東整形外科"), True)
+    eq("name が施設名なら略称を使わない",
+       useshort("柴田外科", "柴田クリニック"), False)
+    eq("分院名で終わる施設名は略称を使わない",
+       useshort("宇梶歯科医院本院", "宇梶歯科"), False)
+    eq("地名で終わる施設名は略称を使わない",
+       useshort("レーベンデンタルクリニック稲城", "レーベンデンタルクリニック"),
+       False)
+    eq("略称が施設名でなければ使わない",
+       useshort("明雪会", "明雪会本部"), False)
+    eq("略称が無ければ使わない", useshort("明雪会", ""), False)
+    eq("name が略称に含まれるなら使わない",
+       useshort("菊地整形外科", "医療法人　菊地整形外科"), False)
 
     failed = 0
     print("=== build_names.py needs_review 逆テスト ===\n")
