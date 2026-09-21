@@ -141,15 +141,22 @@ def load_facility_words(path):
     return sorted(vals, key=len, reverse=True)
 
 
-def load_operator_words(path):
-    """先頭に来たら運営主体とみなす語。略称に残っていても落とす。
+def load_operator_words(path, where="先頭"):
+    """運営主体や保険者を表す語のうち、除く位置 が where のものを返す。
 
-    `国民健康保険` や `市立` は保険者や設置者を表す語で、施設が略称でも
-    名乗っていることがある。略称を根拠に残すと、施設名ではない語が name に
-    入るため、略称の照合より先に判定する。
+    `先頭` は空白で区切られた先頭の語と一致したときだけ落とす。`市立` は
+    施設が略称でも名乗っていることがあるが、施設名ではないので、略称の
+    照合より先に判定して落とす。
+
+    `全体` は名称のどこにあっても落とす。`遠別町国民健康保険診療所` のように
+    自治体名と施設名の間に挟まる語が対象で、先頭だけを見ると当たらない。
+
+    除く位置 の列が無い古い一覧でも、すべて 先頭 として読む。
     """
     with open(path, encoding="utf-8-sig", newline="") as f:
-        return [r["語"].strip() for r in csv.DictReader(f) if r["語"].strip()]
+        return [r["語"].strip() for r in csv.DictReader(f)
+                if r["語"].strip()
+                and (r.get("除く位置") or "先頭").strip() == where]
 
 
 def load_speciality_words(path):
@@ -275,12 +282,18 @@ def entity_head(rest, suffixes, limit=10):
     return ""
 
 
+# 語を落とした跡に残る連続した空白。`下北医療センター 国民健康保険 大畑診療所`
+# から保険者の名を落とすと、空白が2つ並ぶ。
+DOUBLE_SPACE = re.compile(r"[ \u3000]{2,}")
+
+
 def is_facility(token, facility_words):
     return any(token.endswith(w) for w in facility_words)
 
 
 def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
-                 speciality_words=frozenset(), operator_words=()):
+                 speciality_words=frozenset(), operator_words=(),
+                 anywhere_words=()):
     """先頭から運営主体と識別できるトークンだけを取り除く。
 
     戻り値は (施設名, 取り除いた文字列のリスト, 推定で落とした文字列のリスト)。
@@ -393,6 +406,24 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
     # 分けて記録すると実在しない語が並ぶので、落とした範囲を1つにまとめる。
     if rest != before:
         guessed.append(before[:len(before) - len(rest)])
+
+    # 6) 名称のどこにあっても落とす語。`国民健康保険` は保険者の名で、
+    #    `遠別町国民健康保険診療所` のように自治体名と施設名の間に挟まる。
+    #    どの語を落とすかは決まっていて推定ではないので、法人格と同じく
+    #    要確認 は立てず、備考 の記録だけに残す。
+    for word in anywhere_words:
+        if word not in rest:
+            continue
+        # 元データの略称がこの語を含むなら、施設が自ら名乗っている名前の
+        # 一部なので落とさない。
+        if word in _squash(short_name):
+            continue
+        cut = DOUBLE_SPACE.sub(" ", rest.replace(word, "")).strip()
+        # 施設種別語や診療科だけが残ると、どの施設を指すか分からなくなる。
+        if not cut or cut in facility_words or cut in speciality_words:
+            continue
+        removed.append(word)
+        rest = cut
     return rest, removed, guessed
 
 
@@ -476,6 +507,7 @@ def main():
     suffixes = load_suffixes(args.suffixes)
     facility_words = load_facility_words(args.facility_words)
     operator_words = load_operator_words(args.operator_words)
+    anywhere_words = load_operator_words(args.operator_words, "全体")
     speciality_words = load_speciality_words(args.speciality)
     print(f"業態     : {label}")
     print(f"施設票   : {os.path.basename(src)}")
@@ -497,7 +529,7 @@ def main():
             normalized = normalize_chars(original)
             name, removed, guessed = strip_entity(
                 normalized, prefixes, suffixes, facility_words,
-                short, speciality_words, operator_words)
+                short, speciality_words, operator_words, anywhere_words)
             for x in removed:
                 removed_use[x] += 1
 
