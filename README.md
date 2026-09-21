@@ -159,6 +159,7 @@ mapping/
   name_entity_prefixes.csv   法人格と運営主体の先頭パターン
   name_entity_suffixes.csv   法人名トークンの接尾辞
   name_facility_words.csv    施設種別語
+  name_bracket_notes.csv     name から除く括弧書きの注記
   pref_bbox.csv              都道府県の外接矩形。県外を指す座標の判定に使う
 tests/
   known_bad.csv              opening_hours 検証器の逆テスト用フィクスチャ

@@ -148,6 +148,17 @@ def load_bracket_words(path):
                 and (r.get("種別") or "").strip() == "括弧略記"]
 
 
+def load_bracket_notes(path):
+    """括弧に入って現れる注記。`(出張専門)` `(崎の字は山へんに立・可)` など。
+
+    診療のやり方や字体の説明であって施設の名前ではないので name から除く。
+    分院名や地名の括弧書き（`(新宿)`）は一覧に無いので残る。
+    """
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return {r["パターン"].strip() for r in csv.DictReader(f)
+                if r["パターン"].strip()}
+
+
 def load_facility_words(path):
     with open(path, encoding="utf-8-sig", newline="") as f:
         vals = [r["施設種別語"].strip() for r in csv.DictReader(f)
@@ -355,6 +366,56 @@ def use_short_name(name, short_name, facility_words, speciality_words):
     return _squash(name) not in _squash(short_name)
 
 
+def strip_bracket_notes(name, notes):
+    """括弧に入った注記を name から除く。
+
+    戻り値は (施設名, 除いた括弧書きのリスト)。除く対象が無ければ元のまま返す。
+    元の文字列は official_name に残るので、ここで除いても情報は失われない。
+    括弧を外すと名称が空になる行（`(出張専門)` だけの行）は元のまま返す。
+    """
+    dropped = []
+
+    def _drop(m):
+        if m.group(1).strip() in notes:
+            dropped.append(m.group(0))
+            return ""
+        return m.group(0)
+
+    cut = BRACKET.sub(_drop, name)
+    if not dropped:
+        return name, []
+    cut = DOUBLE_SPACE.sub(" ", cut).strip()
+    if not cut:
+        return name, []
+    return cut, dropped
+
+
+def strip_hira_notes(hira):
+    """読みから括弧書きを除く。
+
+    name から注記を除いた行で呼ぶ。元データのフリガナは
+    `アサノハジョサンイン（シュッチョウセンモン）` のように注記の読みまで
+    含んでおり、そのままでは name と対応しない。
+    """
+    cut = DOUBLE_SPACE.sub(" ", BRACKET.sub("", hira)).strip()
+    return cut or hira
+
+
+def _drop_stray_bracket(rest):
+    """対応する相手が無い括弧が先頭に残ったときだけ取り去る。
+
+    元データの 正式名称 には `医療法人社団）いのまた循環器科内科` のように
+    閉じ括弧だけの行がある。法人格を落とすと `）いのまた…` が残る。
+    名称の途中にある閉じない括弧（`キムデンタルクリニック(D.KIMS D`）は
+    施設名の一部が切れた形なので触らない。
+    """
+    if rest[:1] in (")", "）"):
+        return rest[1:].strip() or rest
+    if rest[:1] in ("(", "（") and not any(c in rest for c in ")）"):
+        return rest[1:].strip() or rest
+    return rest
+
+
 def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
                  speciality_words=frozenset(), operator_words=(),
                  anywhere_words=(), bracket_words=()):
@@ -383,6 +444,20 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
             return ""
         return m.group(0)
 
+    # 0b) `医）工藤整形外科` のように閉じ括弧だけで始まる行。開きが無いので
+    #     対を探す _drop_bracket には一致しない。
+    for word in sorted(bracket_words, key=len, reverse=True):
+        for close in (")", "）"):
+            head = word + close
+            if rest.startswith(head) and len(rest) > len(head):
+                removed.append(head)
+                rest = rest[len(head):].strip()
+                had_prefix = True
+                break
+        else:
+            continue
+        break
+
     cut = BRACKET.sub(_drop_bracket, rest)
     if cut != rest:
         cut = DOUBLE_SPACE.sub(" ", cut).strip()
@@ -403,6 +478,8 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
                 changed = True
                 had_prefix = True
                 break
+
+    rest = _drop_stray_bracket(rest)
 
     # 2) 空白区切りのトークン列を先頭から見て、運営主体と識別できる分だけ落とす。
     #    施設名そのものに空白が含まれる例が多いので、識別できなければそこで止める。
@@ -489,6 +566,11 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
     # 分けて記録すると実在しない語が並ぶので、落とした範囲を1つにまとめる。
     if rest != before:
         guessed.append(before[:len(before) - len(rest)])
+
+    # 法人名を落とした跡にも片方だけの括弧が残る。
+    # `医療法人社団潮友会（巡回診療…` の `潮友会` は段5で落ちるので、
+    # 段1の直後だけでは取り去れない。
+    rest = _drop_stray_bracket(rest)
 
     # 6) 名称のどこにあっても落とす語。`国民健康保険` は保険者の名で、
     #    `遠別町国民健康保険診療所` のように自治体名と施設名の間に挟まる。
@@ -580,6 +662,8 @@ def main():
                    default=os.path.join("mapping", "name_facility_words.csv"))
     p.add_argument("--operator-words",
                    default=os.path.join("mapping", "name_operator_words.csv"))
+    p.add_argument("--bracket-notes",
+                   default=os.path.join("mapping", "name_bracket_notes.csv"))
     p.add_argument("--speciality",
                    default=os.path.join("mapping", "speciality_mapping.csv"))
     args = p.parse_args()
@@ -592,6 +676,7 @@ def main():
     operator_words = load_operator_words(args.operator_words)
     anywhere_words = load_operator_words(args.operator_words, "全体")
     bracket_words = load_bracket_words(args.prefixes)
+    bracket_notes = load_bracket_notes(args.bracket_notes)
     speciality_words = load_speciality_words(args.speciality)
     print(f"業態     : {label}")
     print(f"施設票   : {os.path.basename(src)}")
@@ -631,6 +716,10 @@ def main():
                 else:
                     used_short = False
 
+            # 診療形態と字体の説明は施設の名前ではないので name から除く。
+            # 運営主体の除去とは別の判断なので、備考 にも別の文で残す。
+            name, dropped_notes = strip_bracket_notes(name, bracket_notes)
+
             for x in removed:
                 removed_use[x] += 1
 
@@ -641,6 +730,9 @@ def main():
             if removed:
                 notes.append("運営主体を除去: " + "／".join(removed))
                 stats["主体除去"] += 1
+            if dropped_notes:
+                notes.append("括弧の注記を除去: " + "／".join(dropped_notes))
+                stats["注記除去"] += 1
 
             # フリガナは運営主体を含む読みなので、name を削った施設では対応しない
             hira = ""
@@ -650,6 +742,10 @@ def main():
                     stats["読み不一致"] += 1
                 else:
                     hira = to_hiragana(normalize_chars(kana))
+                    # フリガナは注記の読みまで含む。name から注記を除いた行では
+                    # 読みも合わせないと、name:ja-Hira が name と対応しない。
+                    if dropped_notes:
+                        hira = strip_hira_notes(hira)
                     stats["読みあり"] += 1
 
             name_en = ""
@@ -720,6 +816,7 @@ def main():
     print(f"施設数              : {stats['施設']:,}")
     print(f"文字を正規化        : {stats['文字正規化']:,}")
     print(f"運営主体を除去      : {stats['主体除去']:,}")
+    print(f"括弧の注記を除去    : {stats['注記除去']:,}")
     print(f"name:ja-Hira 出力   : {stats['読みあり']:,}")
     print(f"  読み不一致で保留  : {stats['読み不一致']:,}")
     print(f"name:en 出力        : {stats['英語表記あり']:,}")
