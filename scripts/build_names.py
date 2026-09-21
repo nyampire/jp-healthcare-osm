@@ -130,8 +130,22 @@ def load_prefixes(path):
     `社団` が施設名側に残ってしまう。
     """
     with open(path, encoding="utf-8-sig", newline="") as f:
-        vals = [r["パターン"].strip() for r in csv.DictReader(f) if r["パターン"].strip()]
+        vals = [r["パターン"].strip() for r in csv.DictReader(f)
+                if r["パターン"].strip()
+                and (r.get("種別") or "").strip() != "括弧略記"]
     return sorted(vals, key=len, reverse=True)
+
+
+def load_bracket_words(path):
+    """括弧に入って現れる法人格の略記。`(医)` `(有)` `(株)` など。
+
+    展開された `医療法人` とは別に持つ。1文字の略記を先頭パターンの一覧に
+    混ぜると、`医` で始まる施設名の1文字目を落としてしまう。
+    """
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return [r["パターン"].strip() for r in csv.DictReader(f)
+                if r["パターン"].strip()
+                and (r.get("種別") or "").strip() == "括弧略記"]
 
 
 def load_facility_words(path):
@@ -286,6 +300,10 @@ def entity_head(rest, suffixes, limit=10):
 # から保険者の名を落とすと、空白が2つ並ぶ。
 DOUBLE_SPACE = re.compile(r"[ \u3000]{2,}")
 
+# 名称に現れる括弧書き。`(医)成心会なりた内科クリニック` のように先頭にも、
+# `岡本整形外科クリニック(医療法人)` のように末尾にも来る。
+BRACKET = re.compile(r"[(（]([^)）]*)[)）]")
+
 
 def is_facility(token, facility_words):
     return any(token.endswith(w) for w in facility_words)
@@ -339,7 +357,7 @@ def use_short_name(name, short_name, facility_words, speciality_words):
 
 def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
                  speciality_words=frozenset(), operator_words=(),
-                 anywhere_words=()):
+                 anywhere_words=(), bracket_words=()):
     """先頭から運営主体と識別できるトークンだけを取り除く。
 
     戻り値は (施設名, 取り除いた文字列のリスト, 推定で落とした文字列のリスト)。
@@ -354,6 +372,25 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
     guessed = []
     had_prefix = False
     rest = name
+
+    # 0) 括弧に入った法人格。中身が一覧の略記そのものか、法人格で始まる
+    #    （`(医療法人真生会)`）なら括弧ごと落とす。分院名や営業形態の括弧書き
+    #    （`(那覇院)` `(出張専門)`）には触れない。
+    def _drop_bracket(m):
+        inner = m.group(1).strip()
+        if inner in bracket_words or any(inner.startswith(p) for p in prefixes):
+            removed.append(m.group(0))
+            return ""
+        return m.group(0)
+
+    cut = BRACKET.sub(_drop_bracket, rest)
+    if cut != rest:
+        cut = DOUBLE_SPACE.sub(" ", cut).strip()
+        if cut:
+            rest = cut
+            had_prefix = True
+        else:
+            del removed[:]
 
     # 1) 空白を挟まずに法人格が前置されている場合（例: 医療法人社団明和会中村病院）
     changed = True
@@ -522,8 +559,8 @@ def needs_review(name, why=""):
 
     先頭トークンを運営主体と推定して落とした行は理由にする。落とした語は
     行ごとに違い、推定が正しいかは元データだけでは決まらない。外れた行では
-    施設名そのものが name から欠ける。official_name と short_name に元の形が
-    残るので、作業者はその2つと見比べて直せる。
+    施設名そのものが name から欠ける。official_name に元の形が残り、元データの
+    略称 は理由の文の中に書くので、作業者はその2つと見比べて直せる。
     """
     if not name.strip():
         return "yes"
@@ -554,6 +591,7 @@ def main():
     facility_words = load_facility_words(args.facility_words)
     operator_words = load_operator_words(args.operator_words)
     anywhere_words = load_operator_words(args.operator_words, "全体")
+    bracket_words = load_bracket_words(args.prefixes)
     speciality_words = load_speciality_words(args.speciality)
     print(f"業態     : {label}")
     print(f"施設票   : {os.path.basename(src)}")
@@ -575,7 +613,8 @@ def main():
             normalized = normalize_chars(original)
             name, removed, guessed = strip_entity(
                 normalized, prefixes, suffixes, facility_words,
-                short, speciality_words, operator_words, anywhere_words)
+                short, speciality_words, operator_words, anywhere_words,
+                bracket_words)
             # 正式名称に法人名しか入っていない施設は、略称 を name に使う。
             # 法人格を落とした行だけを対象にする。法人格が無い名称は届出の
             # 表記ゆれであって、法人名だけになっている形とは別である。
@@ -585,7 +624,8 @@ def main():
             if used_short:
                 alt = strip_entity(
                     normalize_chars(short), prefixes, suffixes, facility_words,
-                    "", speciality_words, operator_words, anywhere_words)[0]
+                    "", speciality_words, operator_words, anywhere_words,
+                    bracket_words)[0]
                 if looks_like_facility(alt, facility_words, speciality_words):
                     name = alt
                 else:
@@ -642,15 +682,18 @@ def main():
                     name_en = cleaned
                     stats["英語表記あり"] += 1
 
+            # 略称 は OSM のタグに出さないので、参照する文の中に値を書く。
+            ref = f"元データの略称「{short}」と official_name" if short \
+                else "official_name"
             why = ""
             if guessed:
                 why = ("名称の先頭の「" + "」「".join(guessed)
                        + "」を運営主体とみなして name から除いた。"
-                       "official_name と short_name で確かめてください")
+                       f"{ref} で確かめてください")
             if used_short:
                 why = ("正式名称が法人名で終わり施設名を含まないため、"
-                       "name に short_name を使った。"
-                       "official_name と short_name で確かめてください")
+                       f"name に元データの略称「{short}」を使った。"
+                       "official_name で確かめてください")
             if why:
                 notes.append(why)
             review = needs_review(name, why)
