@@ -160,10 +160,27 @@ def load_bracket_notes(path):
 
 
 def load_facility_words(path):
+    """施設種別語。空白区切りのトークンを運営主体かどうか判定する側でも使う。"""
     with open(path, encoding="utf-8-sig", newline="") as f:
         vals = [r["施設種別語"].strip() for r in csv.DictReader(f)
-                if r["施設種別語"].strip()]
+                if r["施設種別語"].strip()
+                and (r.get("種別") or "施設種別").strip() != "末尾の診療科"]
     return sorted(vals, key=len, reverse=True)
+
+
+def load_tail_speciality_words(path):
+    """名称の末尾に来る診療科名。施設名らしいかの判定だけに使う。
+
+    `こやま耳鼻咽喉科` の `耳鼻咽喉科` は施設の種類ではないので、トークンを
+    分ける処理には読ませない。読ませると `耳鼻咽喉科　鈴木医院` の先頭が
+    施設名の一部として保護され、標榜している診療科が name に残る。
+    診療科名の一覧（speciality_mapping.csv）は `耳鼻いんこう科` の表記なので、
+    `耳鼻咽喉科` とは一致しない。
+    """
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return {r["施設種別語"].strip() for r in csv.DictReader(f)
+                if r["施設種別語"].strip()
+                and (r.get("種別") or "").strip() == "末尾の診療科"}
 
 
 def load_operator_words(path, where="先頭"):
@@ -357,13 +374,16 @@ def use_short_name(name, short_name, facility_words, speciality_words):
 
     name が施設種別語も診療科名も含まなければ、施設名が入っていないと判断する。
     `竹内外科胃腸科` のように診療科名を含む名前は、正式名称に施設名があるので
-    使わない。name が 略称 に含まれる場合も、同じ名前の言い換えなので使わない。
+    使わない。
+
+    name が 略称 に含まれるかどうかは見ない。`医療法人光` の 略称 は
+    `安光歯科医院` で、`光` は途中に現れるだけの別の名前である。
+    `医療法人　さんさん` の 略称 `さんさん歯科医院` のように、法人名に施設種別語を
+    足した形も 略称 のほうが施設を指す。
     """
     if has_facility_word(name, facility_words, speciality_words):
         return False
-    if not looks_like_facility(short_name, facility_words, speciality_words):
-        return False
-    return _squash(name) not in _squash(short_name)
+    return looks_like_facility(short_name, facility_words, speciality_words)
 
 
 def strip_bracket_notes(name, notes):
@@ -678,6 +698,8 @@ def main():
     bracket_words = load_bracket_words(args.prefixes)
     bracket_notes = load_bracket_notes(args.bracket_notes)
     speciality_words = load_speciality_words(args.speciality)
+    # 施設名らしいかの判定だけに足す語。トークンの分割には混ぜない。
+    name_words = speciality_words | load_tail_speciality_words(args.facility_words)
     print(f"業態     : {label}")
     print(f"施設票   : {os.path.basename(src)}")
 
@@ -705,13 +727,13 @@ def main():
             # 表記ゆれであって、法人名だけになっている形とは別である。
             used_short = (any(x in prefixes for x in removed)
                           and use_short_name(name, short, facility_words,
-                                             speciality_words))
+                                             name_words))
             if used_short:
                 alt = strip_entity(
                     normalize_chars(short), prefixes, suffixes, facility_words,
                     "", speciality_words, operator_words, anywhere_words,
                     bracket_words)[0]
-                if looks_like_facility(alt, facility_words, speciality_words):
+                if looks_like_facility(alt, facility_words, name_words):
                     name = alt
                 else:
                     used_short = False

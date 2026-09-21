@@ -22,6 +22,9 @@ from build_names import (needs_review, strip_entity,  # noqa: E402
 PFX = ["医療法人社団", "医療法人"]
 SUF = ["会", "機構", "社団"]
 FW = ["病院", "医院", "診療所", "クリニック", "歯科", "センター"]
+# 名称の末尾に来る診療科名。施設名らしいかの判定だけに使い、
+# トークンの分割（is_facility）には読ませない。
+TAIL = {"耳鼻咽喉科"}
 SPEC = {"内科", "外科", "消化器内科", "歯科"}
 OPW = ["市立", "県立"]
 ANY = ["国民健康保険"]
@@ -200,7 +203,7 @@ def main():
         return looks_like_facility(v, FW, SPEC)
 
     def useshort(name, short):
-        return use_short_name(name, short, FW, SPEC)
+        return use_short_name(name, short, FW, SPEC | TAIL)
 
     eq("診療科で終われば施設名とみなす", fac("環状通東整形外科"), True)
     eq("会で終われば施設名とみなさない", fac("明雪会"), False)
@@ -219,6 +222,15 @@ def main():
     eq("略称が無ければ使わない", useshort("明雪会", ""), False)
     eq("name が略称に含まれるなら使わない",
        useshort("菊地整形外科", "医療法人　菊地整形外科"), False)
+    eq("略称の途中に name が現れても別の名前として使う",
+       useshort("光", "安光歯科医院"), True)
+    eq("略称が name に施設種別語を足した形でも使う",
+       useshort("さんさん", "さんさん歯科医院"), True)
+    eq("name が診療科名で終わるなら略称を使わない",
+       useshort("こやま耳鼻咽喉科", "こやま耳鼻咽喉科・アレルギー科"), False)
+    eq("末尾の診療科はトークンの分割には使わない",
+       strip("耳鼻咽喉科 鈴木医院"),
+       ("鈴木医院", ["耳鼻咽喉科"], ["耳鼻咽喉科"]))
 
     failed = 0
     print("=== build_names.py needs_review 逆テスト ===\n")
