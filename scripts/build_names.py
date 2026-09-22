@@ -328,6 +328,10 @@ def entity_head(rest, suffixes, limit=10):
 # から保険者の名を落とすと、空白が2つ並ぶ。
 DOUBLE_SPACE = re.compile(r"[ \u3000]{2,}")
 
+# 語をつなぐときに空白を残す境界。両側が欧字か数字のとき。
+ASCII_HEAD = re.compile(r"[A-Za-z0-9]")
+ASCII_TAIL = re.compile(r"[A-Za-z0-9]$")
+
 # 名称に現れる括弧書き。`(医)成心会なりた内科クリニック` のように先頭にも、
 # `岡本整形外科クリニック(医療法人)` のように末尾にも来る。
 BRACKET = re.compile(r"[(（]([^)）]*)[)）]")
@@ -335,6 +339,46 @@ BRACKET = re.compile(r"[(（]([^)）]*)[)）]")
 
 def is_facility(token, facility_words):
     return any(token.endswith(w) for w in facility_words)
+
+
+def is_only_facility(value, facility_words):
+    """施設の種類を表す語だけでできているかを返す。
+
+    `薬局` や `歯科クリニック` のように施設種別語を取り去ると何も残らない
+    文字列は、どの施設を指すか決められない。運営主体を落とした結果が
+    この形になる行で、落とすのをやめる判定に使う。`荘歯科医院` のように
+    実在の名称もこの形になるので、落とす前後の比較にだけ使い、
+    名称そのものの良し悪しの判定には使わない。
+    """
+    rest = _squash(value)
+    if not rest:
+        return False
+    changed = True
+    while changed:
+        changed = False
+        for word in sorted(facility_words, key=len, reverse=True):
+            if word in rest:
+                rest = rest.replace(word, "")
+                changed = True
+    return not rest
+
+
+def _join_tokens(value):
+    """空白で区切られた語をつないで1つの名称に戻す。
+
+    元データは語の区切りに空白を使うが、`キング　薬局` の空白は表記上の
+    区切りであって名前の一部ではない。詰めて1語にする。ただし
+    `OKP with Life` のように欧字が並ぶ箇所は、詰めると語の切れ目が
+    読めなくなるので空白を残す。
+    """
+    out = ""
+    for token in value.split(" "):
+        if not token:
+            continue
+        if out and ASCII_HEAD.match(token) and ASCII_TAIL.search(out):
+            out += " "
+        out += token
+    return out
 
 
 def looks_like_facility(value, facility_words, speciality_words):
@@ -445,14 +489,23 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
     識別できない場合は元のまま返す。
 
     3つ目は、法人格でも法人名の接尾辞でもなく、施設種別語の位置から運営主体と
-    推定して落としたものである。この推定は外れることがあり、外れた行では
-    `楠井　歯科` が `歯科` になる。正しいかどうかは元データだけでは決まらないので、
+    推定して落としたものである。この推定が誤っている行では、施設名の一部を
+    name から除いてしまう。正しいかどうかは元データだけでは決まらないので、
     呼び出し側で作業者に確かめてもらう印に使う。
+
+    推定して落とした結果が施設種別語だけになった行では、落とした分を戻す。
+    `キング　薬局` が `薬局` になると、どの薬局を指すか決められないためである。
+    戻した行では3つ目が空になり、要確認 も立たない。
     """
     removed = []
     guessed = []
     had_prefix = False
     rest = name
+    # 推定で語を落とす前の文字列。落とした結果が施設種別語だけになったとき、
+    # ここへ戻す。
+    before_guess = None
+    # 法人名を落とすのをやめた行。名称に残る空白を詰めて返す。
+    join_at_end = False
 
     # 0) 括弧に入った法人格。中身が一覧の略記そのものか、法人格で始まる
     #    （`(医療法人真生会)`）なら括弧ごと落とす。分院名や営業形態の括弧書き
@@ -510,6 +563,15 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
             break
         # 2a) 法人格そのもの、または法人名の接尾辞で終わるトークン
         if head in prefixes or any(head.endswith(s) for s in suffixes):
+            # 落とすと施設の種類を表す語だけが残る行では落とさない。
+            # `晋栄福祉会　診療所` が `診療所` になり、どの診療所を指すか
+            # 決められなくなる。ただし元データの略称が残りだけを名乗って
+            # いるなら、それが施設の名前である（`仁寿会　荘病院` の略称は
+            # `荘病院`）。
+            if (is_only_facility(tail, facility_words)
+                    and _squash(short_name) != _squash(tail)):
+                join_at_end = True
+                break
             removed.append(head)
             rest = tail
             continue
@@ -520,6 +582,8 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
                 and is_facility(tail.split(" ")[-1], facility_words)):
             # 診療科そのものと運営主体の語は、略称に残っていても落とす。
             if head in speciality_words or any(w in head for w in operator_words):
+                if before_guess is None:
+                    before_guess = rest
                 removed.append(head)
                 guessed.append(head)
                 rest = tail
@@ -528,11 +592,23 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
             # 名前の一部であって運営主体ではない。落とさずにここで止める。
             if short_name and _squash(short_name) == _squash(head) + _squash(tail):
                 break
+            if before_guess is None:
+                before_guess = rest
             removed.append(head)
             guessed.append(head)
             rest = tail
             continue
         break
+
+    # 2') 推定で落とした結果、施設の種類を表す語だけが残ることがある。
+    #     `キング　薬局` が `薬局` に、`しまだ　みみ・はな・のど　クリニック` が
+    #     `クリニック` になり、どの施設を指すか決められない。推定で落とした分を
+    #     まとめて戻す。段2a で落とした法人格は運営主体そのものなので戻さない。
+    if before_guess is not None and is_only_facility(rest, facility_words):
+        for token in guessed:
+            removed.remove(token)
+        guessed.clear()
+        rest = _join_tokens(before_guess)
 
     # 3) トークンを落とした結果、先頭に再び法人格が現れることがある
     #    （例: `医療法人社団温光会 医療法人内藤病院`）。もう一度当てる。
@@ -574,7 +650,8 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
             break
         # 施設種別語や診療科だけが残ると、どの施設を指すか分からなくなる。
         # `日本相撲協会診療所` が `診療所` に、`六会眼科` が `眼科` になる。
-        if tail in facility_words or tail in speciality_words:
+        # `歯科診療所` のように施設種別語が連なる形も同じ扱いにする。
+        if is_only_facility(tail, facility_words) or tail in speciality_words:
             break
         # 何に附属するかが消える。`岩手県予防医学協会附属診療所` が
         # `附属診療所` になる。
@@ -609,6 +686,9 @@ def strip_entity(name, prefixes, suffixes, facility_words, short_name="",
             continue
         removed.append(word)
         rest = cut
+
+    if join_at_end:
+        rest = _join_tokens(rest)
     return rest, removed, guessed
 
 
