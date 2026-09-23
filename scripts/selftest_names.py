@@ -17,7 +17,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_names import (needs_review, strip_entity,  # noqa: E402
                          looks_like_facility, use_short_name,
-                         strip_bracket_notes, strip_hira_notes)
+                         strip_bracket_notes, strip_bracket_alt,
+                         strip_hira_notes)
 
 PFX = ["医療法人社団", "医療法人"]
 SUF = ["会", "機構", "社団"]
@@ -30,6 +31,8 @@ OPW = ["市立", "県立"]
 ANY = ["国民健康保険"]
 BRK = ["医", "有", "株"]
 NOTES = {"出張専門", "往診専門", "崎の字は山へんに立・可"}
+ALT = {"ユナイテッドクリニック": ("別名", "ユナイテッドクリニック"),
+       "旧 子待ち助産院": ("旧称", "子待ち助産院")}
 
 
 def strip(name, short=""):
@@ -215,6 +218,24 @@ def main():
        notes("(出張専門)"), ("(出張専門)", []))
     eq("落とした跡の空白を詰める",
        notes("大西助産院 (出張専門)"), ("大西助産院", ["(出張専門)"]))
+
+    # 括弧に入った別名と旧称。施設の名前なので name から除いたうえで
+    # alt_name と old_name に出す。
+    def alt(value):
+        return strip_bracket_alt(value, ALT)
+
+    eq("別名を alt_name に出す",
+       alt("ギガクリニック札幌院(ユナイテッドクリニック)"),
+       ("ギガクリニック札幌院", "ユナイテッドクリニック", "",
+        ["(ユナイテッドクリニック)"]))
+    eq("旧称は old_name に出し 旧 を値に含めない",
+       alt("めぐみ助産院 (旧 子待ち助産院)"),
+       ("めぐみ助産院", "", "子待ち助産院", ["(旧 子待ち助産院)"]))
+    eq("一覧に無い括弧書きは残す",
+       alt("赤羽歯科(新宿)"), ("赤羽歯科(新宿)", "", "", []))
+    eq("除くと空になるなら除かない",
+       alt("(ユナイテッドクリニック)"),
+       ("(ユナイテッドクリニック)", "", "", []))
 
     # フリガナ側の括弧。name から注記を除いた行では、読みも対応させる。
     eq("読みの括弧書きを落とす",

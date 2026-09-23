@@ -159,6 +159,22 @@ def load_bracket_notes(path):
                 if r["パターン"].strip()}
 
 
+def load_bracket_alt(path):
+    """括弧に入って現れる別名と旧称。`(ユナイテッドクリニック)` など。
+
+    施設の名前なので、注記とは違って捨てずに alt_name と old_name へ移す。
+    どの括弧書きが別名でどれが分院名かは元データのカラムでは区別できないので、
+    一覧に書いた文字列とだけ照合する。
+    """
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        out = {}
+        for r in csv.DictReader(f):
+            pattern = r["パターン"].strip()
+            if pattern:
+                out[pattern] = (r["種別"].strip(), r["値"].strip())
+        return out
+
+
 def load_facility_words(path):
     """施設種別語。空白区切りのトークンを運営主体かどうか判定する側でも使う。"""
     with open(path, encoding="utf-8-sig", newline="") as f:
@@ -452,6 +468,36 @@ def strip_bracket_notes(name, notes):
     if not cut:
         return name, []
     return cut, dropped
+
+
+def strip_bracket_alt(name, alt):
+    """括弧に入った別名と旧称を name から除き、値を返す。
+
+    戻り値は (施設名, alt_name, old_name, 除いた括弧書きのリスト)。
+    `ギガクリニック札幌院(ユナイテッドクリニック)` は name が
+    `ギガクリニック札幌院`、alt_name が `ユナイテッドクリニック` になる。
+    括弧を外すと名称が空になる行は元のまま返す。
+    """
+    dropped = []
+    found = []
+
+    def _drop(m):
+        hit = alt.get(m.group(1).strip())
+        if hit:
+            dropped.append(m.group(0))
+            found.append(hit)
+            return ""
+        return m.group(0)
+
+    cut = BRACKET.sub(_drop, name)
+    if not dropped:
+        return name, "", "", []
+    cut = DOUBLE_SPACE.sub(" ", cut).strip()
+    if not cut:
+        return name, "", "", []
+    alt_name = "／".join(v for kind, v in found if kind == "別名")
+    old_name = "／".join(v for kind, v in found if kind == "旧称")
+    return cut, alt_name, old_name, dropped
 
 
 def strip_hira_notes(hira):
@@ -764,6 +810,8 @@ def main():
                    default=os.path.join("mapping", "name_operator_words.csv"))
     p.add_argument("--bracket-notes",
                    default=os.path.join("mapping", "name_bracket_notes.csv"))
+    p.add_argument("--bracket-alt",
+                   default=os.path.join("mapping", "name_bracket_alt.csv"))
     p.add_argument("--speciality",
                    default=os.path.join("mapping", "speciality_mapping.csv"))
     args = p.parse_args()
@@ -777,6 +825,7 @@ def main():
     anywhere_words = load_operator_words(args.operator_words, "全体")
     bracket_words = load_bracket_words(args.prefixes)
     bracket_notes = load_bracket_notes(args.bracket_notes)
+    bracket_alt = load_bracket_alt(args.bracket_alt)
     speciality_words = load_speciality_words(args.speciality)
     # 施設名らしいかの判定だけに足す語。トークンの分割には混ぜない。
     name_words = speciality_words | load_tail_speciality_words(args.facility_words)
@@ -822,6 +871,11 @@ def main():
             # 運営主体の除去とは別の判断なので、備考 にも別の文で残す。
             name, dropped_notes = strip_bracket_notes(name, bracket_notes)
 
+            # 括弧に入った別名と旧称は施設の名前なので、捨てずに
+            # alt_name と old_name へ移す。
+            name, alt_name, old_name, dropped_alt = strip_bracket_alt(
+                name, bracket_alt)
+
             for x in removed:
                 removed_use[x] += 1
 
@@ -835,6 +889,9 @@ def main():
             if dropped_notes:
                 notes.append("括弧の注記を除去: " + "／".join(dropped_notes))
                 stats["注記除去"] += 1
+            if dropped_alt:
+                notes.append("括弧の別名と旧称を移動: " + "／".join(dropped_alt))
+                stats["別名移動"] += 1
 
             # フリガナは運営主体を含む読みなので、name を削った施設では対応しない
             hira = ""
@@ -846,7 +903,7 @@ def main():
                     hira = to_hiragana(normalize_chars(kana))
                     # フリガナは注記の読みまで含む。name から注記を除いた行では
                     # 読みも合わせないと、name:ja-Hira が name と対応しない。
-                    if dropped_notes:
+                    if dropped_notes or dropped_alt:
                         hira = strip_hira_notes(hira)
                     stats["読みあり"] += 1
 
@@ -896,7 +953,8 @@ def main():
                 notes.append(why)
             review = needs_review(name, why)
             rows.append([fid, original, short, kana, en,
-                         name, original, short, hira, name_en, name_latn,
+                         name, original, short, alt_name, old_name,
+                         hira, name_en, name_latn,
                          review, " / ".join(notes), why])
             stats["施設"] += 1
             if review:
@@ -909,7 +967,8 @@ def main():
         w = csv.writer(f)
         w.writerow(["ID",
                     f"元_{col_name}", "元_略称", "元_フリガナ", "元_英語表記",
-                    "name", "official_name", "short_name", "name:ja-Hira",
+                    "name", "official_name", "short_name",
+                    "alt_name", "old_name", "name:ja-Hira",
                     "name:en", "name:ja-Latn", "要確認", "備考",
                     "要確認の理由"])
         w.writerows(rows)
@@ -919,6 +978,7 @@ def main():
     print(f"文字を正規化        : {stats['文字正規化']:,}")
     print(f"運営主体を除去      : {stats['主体除去']:,}")
     print(f"括弧の注記を除去    : {stats['注記除去']:,}")
+    print(f"別名と旧称を移動    : {stats['別名移動']:,}")
     print(f"name:ja-Hira 出力   : {stats['読みあり']:,}")
     print(f"  読み不一致で保留  : {stats['読み不一致']:,}")
     print(f"name:en 出力        : {stats['英語表記あり']:,}")
