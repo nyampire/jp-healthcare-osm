@@ -27,7 +27,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_opening_hours import (DECISION_UNKNOWN,  # noqa: E402
                                  DECISION_WITHHOLD, build_notes,
-                                 closure_comment, needs_review_hours,
+                                 closure_comment, format_days,
+                                 needs_review_hours,
                                  resolve_conflicts)
 
 
@@ -116,6 +117,21 @@ def main():
 
     _, wh3, unk3 = resolve_conflicts({}, fac_of("月火"))
     eq("時刻が1つも無ければ出力を見送る", (sorted(wh3), unk3), (["f"], {}))
+
+    # 6. 連続する曜日の書き方
+    eq("3日以上続く曜日は範囲で書く",
+       format_days(["Mo", "Tu", "We", "Th", "Fr"]), "Mo-Fr")
+    eq("3日ちょうどでも範囲で書く", format_days(["Fr", "Sa", "Su"]), "Fr-Su")
+    eq("2日の連続は並べたまま", format_days(["Sa", "Su"]), "Sa,Su")
+    eq("連続しない曜日は並べたまま", format_days(["Mo", "We", "Fr"]), "Mo,We,Fr")
+    eq("範囲と単独の曜日を混ぜる",
+       format_days(["Mo", "Tu", "We", "Fr"]), "Mo-We,Fr")
+    eq("週をまたいで日曜と月曜をつながない",
+       format_days(["Mo", "Tu", "Sa", "Su"]), "Mo,Tu,Sa,Su")
+    eq("祝日は範囲に含めない",
+       format_days(["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su", "PH"]), "Mo-Su,PH")
+    eq("土日と祝日の3つは範囲にしない",
+       format_days(["Sa", "Su", "PH"]), "Sa,Su,PH")
 
     failed = 0
     print("=== build_opening_hours.py 備考と要確認 逆テスト ===\n")

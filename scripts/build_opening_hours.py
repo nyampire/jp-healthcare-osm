@@ -331,6 +331,28 @@ def format_date_rule(dates):
 FULLWIDTH_DIGITS = {1: "１", 2: "２", 3: "３", 4: "４", 5: "５"}
 
 
+def format_days(days):
+    """曜日の並びを opening_hours の形にする。3日以上続く曜日は範囲で書く。
+
+    2日の連続は Mo,Tu のままにする。Mo-Tu と文字数が変わらないため。
+    祝日（PH）は曜日の続きではないので範囲に含めない。
+    """
+    week = [OSM_DAY[d] for d in DAYS]
+    out = []
+    i = 0
+    while i < len(days):
+        j = i
+        while (j + 1 < len(days) and days[j] in week and days[j + 1] in week
+               and week.index(days[j + 1]) == week.index(days[j]) + 1):
+            j += 1
+        if j - i >= 2:
+            out.append(f"{days[i]}-{days[j]}")
+        else:
+            out.extend(days[i:j + 1])
+        i = j + 1
+    return ",".join(out)
+
+
 def nth_col(profile, n, d):
     """定期休の列名を組み立てる。薬局だけ週番号が全角数字で書かれている。"""
     num = FULLWIDTH_DIGITS[n] if profile.get("nth_fullwidth") else n
@@ -557,14 +579,14 @@ def build_opening_hours(intervals, fac, profile, withheld=frozenset(),
         grp = collections.OrderedDict()
         for d, t in parts:
             grp.setdefault(t, []).append(d)
-        rules = [f"{','.join(ds)} {t}" for t, ds in grp.items()]
+        rules = [f"{format_days(ds)} {t}" for t, ds in grp.items()]
 
         # 時刻の分からない営業日。時刻の規則の直後に置き、定期週の休診や
         # 特定日の休診には上書きさせる。これらの曜日は時刻を持たないので
         # nth_week_rules の対象にもならない。
         unk = unknown_days.get(fid)
         if unk:
-            rules.append(f"{','.join(OSM_DAY[d] for d in unk)} unknown")
+            rules.append(f"{format_days([OSM_DAY[d] for d in unk])} unknown")
 
         nth = nth_week_rules(meta["row"], meta["idx"],
                              lambda d: bool(intervals.get((fid, d))), profile)
