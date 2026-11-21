@@ -68,7 +68,7 @@ export NJA_API_BASE=/path/to/japanese-addresses-v2/out/api/ja
 | `opening_hours` | 全業態 | 193,652 |
 | `healthcare:speciality` | 病院、診療所、歯科診療所 | 137,361 |
 | `website` | 全業態 | 122,081 |
-| `addr:full` | 全業態 | 196,680 |
+| `addr:full` | `addr:*` で住所を表しきれない行 | 141,463 |
 | `addr:country` | 全業態 | 196,680 |
 | `addr:province` | 全業態 | 196,680 |
 | `addr:county` | 郡がある住所 | 11,633 |
@@ -92,7 +92,11 @@ NJA は `○○町` の `町` を落とした別名を町字パターンとし�
 誤った町字は OSM 上で別の場所を指すため、出さないほうがましと判断しました。
 どの行がそれかは町字マスタに照会して決めています（`scripts/town_overmatch.js`）。
 正しい町字の候補は備考と MapRoulette のタスクに回し、作業者に見せます。
-元の住所文字列は `addr:full` に全件残るので、情報は失われません。
+町字を出さなかった行では `addr:full` を出力するので、元の住所文字列は失われません。
+
+`addr:*` で号まで表せて、解釈できなかった文字列も残らない55,217行には、`addr:full` を付けていません。
+OSM wiki の Key:addr:* が、`addr:full` を住所の構造が見当たらない場合のタグとしているためです。
+詳細は [processing.md](docs/processing.md) の「addr:* で住所を表せた行では addr:full を出さない」にあります。
 
 `ref` 系のタグは付けていません。
 医療情報ネットの ID を OSM のどのキーで持つかは合意が要るため、`ID` 列を残すに留めています。

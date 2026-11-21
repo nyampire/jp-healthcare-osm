@@ -44,9 +44,14 @@ SECTORS = {
 }
 
 # タスクに載せるタグ。この順で properties に入る。
+# addr:* で住所が表せる行は addr:full を持たないので、addr:* も載せる（Issue #8）。
 TAG_KEYS = ["amenity", "healthcare", "name", "official_name",
             "name:ja-Hira", "name:ja-Latn", "name:en", "opening_hours",
-            "healthcare:speciality", "website", "addr:full", "beds", "source"]
+            "healthcare:speciality", "website", "addr:full",
+            "addr:country", "addr:province", "addr:county", "addr:city",
+            "addr:suburb", "addr:quarter", "addr:neighbourhood",
+            "addr:block_number", "addr:housenumber",
+            "beds", "source"]
 
 
 def clip_notes(text, limit=200):

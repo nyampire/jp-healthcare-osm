@@ -197,7 +197,8 @@ def resolve_neighbourhood(g):
     正しい町字の候補を 町字の修正候補 列に入れている。判定の中身は
     scripts/town_overmatch.js にある。
 
-    元の住所文字列は addr:full に全件残るので、情報は失われない。
+    町字を出さなかった行では addr:full に元の住所文字列が残るので、
+    情報は失われない。
     修正候補は備考に回し、MapRoulette で作業者に見せる。
     行ごとに違う文なので、200文字で切られても先頭に残る。
 
@@ -490,7 +491,8 @@ def main():
         # 推定の番地は出さない。台帳と突き合わせられた8,219件のうち番地が
         # 実在したのは33.9%で、街区符号が100を超える545件は0%だった。
         # 誤った番地は OSM 上で別の建物を指すため、無いほうがましと判断した。
-        # 元の住所文字列は addr:full に全件残るので、情報は失われない。
+        # 番地を出さなかった行では addr:full に元の住所文字列が残るので、
+        # 情報は失われない。
         # 対象は 番地の根拠 列で数えられる。
         inferred = g.get("番地の根拠", "") == "推定"
         block_number = "" if inferred else g.get("addr:block_number", "")
@@ -508,6 +510,17 @@ def main():
             notes.append(town_why)
             stat["町字を出さなかった"] += 1
 
+        # addr:* で住所がすべて表せる行では addr:full を出さない（Issue #8）。
+        # OSM wiki の Key:addr:* は、addr:full を住所の構造が見当たらない
+        # 場合に使うタグとしている。未解釈の文字列が残る行では、建物名や
+        # 枝番（1番3-5号の -5 など）が addr:full にしか無いので残す。
+        # 番地や町字を落とした行も、空の値で判定するので addr:full が残る。
+        structured = bool(neighbourhood and block_number and housenumber
+                          and not g.get("未解釈の文字列", ""))
+        addr_full = "" if structured else g["元_所在地"]
+        if structured:
+            stat["addr:full を出さなかった"] += 1
+
         tags = {
             "amenity": ft["amenity"].strip(),
             "healthcare": ft["healthcare"].strip(),
@@ -522,7 +535,7 @@ def main():
             "healthcare:speciality": sp.get("healthcare:speciality", ""),
             "emergency": emergency_tag(ft["amenity"].strip(), sp),
             "website": website,
-            "addr:full": g["元_所在地"],
+            "addr:full": addr_full,
             "addr:country": g.get("addr:country", ""),
             "addr:province": g.get("addr:province", ""),
             "addr:county": g.get("addr:county", ""),
