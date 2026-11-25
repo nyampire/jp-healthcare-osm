@@ -65,6 +65,7 @@ export NJA_API_BASE=/path/to/japanese-addresses-v2/out/api/ja
 | `name:ja-Hira` | 全業態 | 150,774 |
 | `name:ja-Latn` | 全業態 | 76,199 |
 | `name:en` | 全業態 | 81,589 |
+| `branch` | 薬局 | 24,806 |
 | `opening_hours` | 全業態 | 193,652 |
 | `healthcare:speciality` | 病院、診療所、歯科診療所 | 137,361 |
 | `website` | 全業態 | 122,081 |
@@ -97,6 +98,12 @@ NJA は `○○町` の `町` を落とした別名を町字パターンとし�
 `addr:*` で号まで表せて、解釈できなかった文字列も残らない55,217行には、`addr:full` を付けていません。
 OSM wiki の Key:addr:* が、`addr:full` を住所の構造が見当たらない場合のタグとしているためです。
 詳細は [processing.md](docs/processing.md) の「addr:* で住所を表せた行では addr:full を出さない」にあります。
+
+薬局の24,806行では、`name` から支店名を外して `branch` に出しています。
+`レインボー薬局　上磯店` は、`name` が `レインボー薬局`、`branch` が `上磯店` になります。
+`name:ja-Hira` と `name:ja-Latn` と `name:en` も店名の部分だけにし、店名と支店名に切れなかった値はタグに出しません。
+その値は `<業態>_osm.csv` の末尾の非タグ列と MapRoulette のタスクに載せ、作業者に見せます。
+詳細は [processing.md](docs/processing.md) の「薬局の支店名を branch に分ける」にあります。
 
 `ref` 系のタグは付けていません。
 医療情報ネットの ID を OSM のどのキーで持つかは合意が要るため、`ID` 列を残すに留めています。
@@ -141,6 +148,7 @@ scripts/
   build_opening_hours.py     曜日フラグと時刻から opening_hours を組み立てる
   build_speciality.py        診療科目コードを healthcare:speciality へ対応付ける
   build_names.py             名称を正規化し name 系のタグを作る
+  branch_split.py            薬局の正式名称を店名と支店名に分ける
   build_addr.js              住所を addr:* に構造化し、座標が無い施設を補完する
   addr_columns.js            住所と座標を出力列に畳む純関数
   fix_placeholder_coords.js  元データが穴埋めに入れた座標を捨てる
@@ -156,6 +164,7 @@ scripts/
   selftest_addr.js           住所の列を畳む純関数の逆テスト
   selftest_placeholder.js    穴埋めの座標を見分ける処理の逆テスト
   selftest_osm.py            OSM 出力検証器の逆テスト
+  selftest_branch.py         店名と支店名の分け方の逆テスト
 mapping/
   speciality_mapping.csv     診療科目コード127種から OSM 値への対応表
   speciality_rollup.csv      タグ値255文字を超えたときの畳み先

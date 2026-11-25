@@ -106,7 +106,9 @@ def main():
     # タグでない列。ここに足し忘れると、日本語の列名が bad_key として
     # 検出され、非タグ列を増やすたびに検証が落ちる。
     NON_TAG_COLUMNS = ("ID", "都道府県コード", "lat", "lon", "座標の出典",
-                       "要確認", "備考", "未解釈の文字列", "fixme の内容")
+                       "要確認", "備考", "未解釈の文字列", "fixme の内容",
+                       "分けられなかった name:ja-Hira", "分けられなかった name:ja-Latn",
+                       "分けられなかった name:en")
     tag_keys = [k for k in rows[0].keys()
                 if k not in NON_TAG_COLUMNS] if rows else []
     value_use = collections.Counter()

@@ -45,7 +45,7 @@ SECTORS = {
 
 # タスクに載せるタグ。この順で properties に入る。
 # addr:* で住所が表せる行は addr:full を持たないので、addr:* も載せる（Issue #8）。
-TAG_KEYS = ["amenity", "healthcare", "name", "official_name",
+TAG_KEYS = ["amenity", "healthcare", "name", "branch", "official_name",
             "name:ja-Hira", "name:ja-Latn", "name:en", "opening_hours",
             "healthcare:speciality", "website", "addr:full",
             "addr:country", "addr:province", "addr:county", "addr:city",
@@ -137,6 +137,12 @@ def main():
                         props["_未解釈の文字列"] = r["未解釈の文字列"][:200]
                     if r.get("fixme の内容"):
                         props["_fixme"] = r["fixme の内容"][:200]
+                    # 支店名を分けたが店名の部分に切れなかった元の値。
+                    # タグごとに別のプロパティにする（Issue #12）。
+                    for k in ("name:ja-Hira", "name:ja-Latn", "name:en"):
+                        v = r.get(f"分けられなかった {k}")
+                        if v:
+                            props[f"_分けられなかった {k}"] = v
                     task = {
                         "type": "FeatureCollection",
                         "features": [{

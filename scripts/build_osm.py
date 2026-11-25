@@ -62,6 +62,12 @@ RE_BARE_DOMAIN = re.compile(r"^[\w-]+(\.[\w-]+)+(/\S*)?$")
 RE_MISSING_COLON = re.compile(r"^(https?)//(\S+)$")
 
 
+# 薬局の支店名を branch に分けたが、店名の部分に切れなかった元の値（Issue #12）。
+# タグには出さず、CSV の末尾と MapRoulette のタスクで作業者に見せる。
+DROPPED_COLUMNS = ["分けられなかった name:ja-Hira", "分けられなかった name:ja-Latn",
+                   "分けられなかった name:en"]
+
+
 def resolve(base, pattern):
     hits = sorted(glob.glob(os.path.join(base, pattern)))
     if not hits:
@@ -321,14 +327,15 @@ def write_osm_files(base, rows, features, keys):
     """
     with open(base + ".csv", "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
-        # 末尾4列はタグではない。keys がタグ列の全体で、その後ろは
+        # 末尾の列はタグではない。keys がタグ列の全体で、その後ろは
         # 作業者に渡す申し送りが並ぶ。GeoJSON 側には出さない。
         w.writerow(["ID", "都道府県コード", "lat", "lon", "座標の出典"] + keys
-                   + ["要確認", "備考", "未解釈の文字列", "fixme の内容"])
-        for fid, pref, la, lo, origin, tags, review, note, residue, fixme in rows:
+                   + ["要確認", "備考", "未解釈の文字列", "fixme の内容"]
+                   + DROPPED_COLUMNS)
+        for fid, pref, la, lo, origin, tags, review, note, residue, fixme, dropped in rows:
             w.writerow([fid, pref, la, lo, origin]
                        + [tags.get(k, "") for k in keys]
-                       + [review, note, residue, fixme])
+                       + [review, note, residue, fixme] + dropped)
     with open(base + ".geojson", "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": features},
                   f, ensure_ascii=False)
@@ -528,6 +535,7 @@ def main():
             "official_name": nm.get("official_name", ""),
             "alt_name": nm.get("alt_name", ""),
             "old_name": nm.get("old_name", ""),
+            "branch": nm.get("branch", ""),
             "name:ja-Hira": nm.get("name:ja-Hira", ""),
             "name:ja-Latn": nm.get("name:ja-Latn", ""),
             "name:en": nm.get("name:en", ""),
@@ -558,7 +566,8 @@ def main():
         review = needs_review(nm, hr, g, town_why, housenumber_dropped)
         rows.append((fid, g["都道府県コード"], la, lo, g["座標の出典"], tags, review,
                      join_notes(notes, common),
-                     g.get("未解釈の文字列", ""), g.get("fixme", "")))
+                     g.get("未解釈の文字列", ""), g.get("fixme", ""),
+                     [nm.get(c, "") for c in DROPPED_COLUMNS]))
         features.append({
             "type": "Feature",
             # GeoJSON は経度が先。緯度を先に置くと日本の施設が海上へ飛ぶ
@@ -571,7 +580,7 @@ def main():
     # short_name が求める「通用している短い名前」と一致するか確かめられない。
     # 判定には使い続けるが、値は 要確認の理由 の文の中だけに出す。
     keys = ["amenity", "healthcare", "name", "official_name",
-            "alt_name", "old_name",
+            "alt_name", "old_name", "branch",
             "name:ja-Hira", "name:ja-Latn", "name:en", "opening_hours",
             "healthcare:speciality", "emergency", "website", "addr:full",
             "addr:country", "addr:province", "addr:county", "addr:city",

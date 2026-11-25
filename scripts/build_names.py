@@ -60,6 +60,10 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from branch_split import (borrow_reading, split_english,  # noqa: E402
+                          split_latn_by_reading, split_name, split_reading)
+
 SECTORS = {
     "hospital": ("病院", "01-1_hospital_facility_info_*.csv",
                  "正式名称", "略称", "正式名称（フリガナ）", "英語表記（ローマ字表記）"),
@@ -797,6 +801,55 @@ def needs_review(name, why=""):
     return ""
 
 
+# names.csv の行の中の位置
+COL_NAME, COL_BRANCH, COL_HIRA, COL_LATN, COL_NOTES = 5, 10, 11, 13, 15
+# 支店名を分けたが店名の部分に切れなかった元の値。タグには出さず、
+# MapRoulette のタスクで作業者に見せる。
+COL_DROP_HIRA, COL_DROP_LATN, COL_DROP_EN = 17, 18, 19
+
+
+def fill_branch_readings(rows, pending_rows, stats):
+    """目印で切れなかった読みとローマ字を、ほかの手がかりで切る（Issue #12）。
+
+    読み仮名は、同じ店名のほかの行で切れた読みを借りる。
+    `薬局マツモトキヨシ エスパル福島店` は店名が「薬局」で終わらず読みに
+    空白も無いが、ほかの行で切れた `やっきょくまつもときよし` で始まる。
+
+    ローマ字は、店名と支店名の読みを手がかりに切れ目を探す。
+    `Norden Yakkoku Kitachitoseten` は「yakkyoku」の綴りが誤っていて
+    目印で切れない。
+
+    どちらでも切れない値は出さず、備考に理由を残す。
+    """
+    known = collections.defaultdict(set)
+    for row in rows:
+        if row[COL_BRANCH] and row[COL_HIRA]:
+            known[row[COL_NAME]].add(re.sub(r"\s", "", row[COL_HIRA]))
+    for i, full_hira, full_latn in pending_rows:
+        row = rows[i]
+        extra = []
+        if full_hira and not row[COL_HIRA]:
+            row[COL_HIRA] = borrow_reading(full_hira, known.get(row[COL_NAME]))
+            if row[COL_HIRA]:
+                stats["name:ja-Hira を同じ店名の行から切った"] += 1
+            else:
+                row[COL_DROP_HIRA] = full_hira
+                extra.append(f"name:ja-Hira を店名と支店名に分けられないため出力しない: {full_hira}")
+                stats["name:ja-Hira を分けられず出力しない"] += 1
+        if full_latn and not row[COL_LATN]:
+            head = row[COL_HIRA]
+            tail = re.sub(r"\s", "", full_hira)[len(re.sub(r"\s", "", head)):] if head else ""
+            row[COL_LATN] = split_latn_by_reading(full_latn, head, tail.lstrip("・･.、"))
+            if row[COL_LATN]:
+                stats["name:ja-Latn を読みを手がかりに切った"] += 1
+            else:
+                row[COL_DROP_LATN] = full_latn
+                extra.append(f"name:ja-Latn を店名と支店名に分けられないため出力しない: {full_latn}")
+                stats["name:ja-Latn を分けられず出力しない"] += 1
+        if extra:
+            row[COL_NOTES] = " / ".join([x for x in [row[COL_NOTES], *extra] if x])
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data-dir", default=".")
@@ -833,6 +886,8 @@ def main():
     print(f"施設票   : {os.path.basename(src)}")
 
     rows = []
+    # 支店名を分けたが、読みかローマ字が目印で切れなかった行
+    pending_rows = []
     stats = collections.Counter()
     removed_use = collections.Counter()
 
@@ -937,6 +992,30 @@ def main():
                     name_en = cleaned
                     stats["英語表記あり"] += 1
 
+            # 薬局の支店名を branch に分ける（Issue #12）。読みと英語名も
+            # 店名の部分だけにする。目印（やっきょく、yakkyoku）で切れなかった
+            # 読みは、全行を読み終えてから同じ店名のほかの行を手がかりに切る。
+            branch = ""
+            pending = None
+            dropped_en = ""
+            split = split_name(name) if args.sector == "pharmacy" else None
+            if split:
+                name, branch = split
+                notes.append(f"支店名を branch に分けた: {branch}")
+                stats["支店名を分けた"] += 1
+                full_hira, full_latn = hira, name_latn
+                hira = split_reading(full_hira, name, "やっきょく")
+                name_latn = split_reading(full_latn, name, "yakkyoku")
+                if name_en:
+                    cut = split_english(name_en, name)
+                    if not cut:
+                        notes.append(f"name:en を店名と支店名に分けられないため出力しない: {name_en}")
+                        stats["name:en を分けられず出力しない"] += 1
+                        dropped_en = name_en
+                    name_en = cut
+                if (full_hira and not hira) or (full_latn and not name_latn):
+                    pending = (full_hira, full_latn)
+
             # 略称 は OSM のタグに出さないので、参照する文の中に値を書く。
             ref = f"元データの略称「{short}」と official_name" if short \
                 else "official_name"
@@ -952,13 +1031,17 @@ def main():
             if why:
                 notes.append(why)
             review = needs_review(name, why)
+            if pending:
+                pending_rows.append((len(rows), *pending))
             rows.append([fid, original, short, kana, en,
-                         name, original, short, alt_name, old_name,
+                         name, original, short, alt_name, old_name, branch,
                          hira, name_en, name_latn,
-                         review, " / ".join(notes), why])
+                         review, " / ".join(notes), why, "", "", dropped_en])
             stats["施設"] += 1
             if review:
                 stats["要確認"] += 1
+
+    fill_branch_readings(rows, pending_rows, stats)
 
     build_dir = os.path.join(args.out_dir, "build")
     os.makedirs(build_dir, exist_ok=True)
@@ -968,9 +1051,10 @@ def main():
         w.writerow(["ID",
                     f"元_{col_name}", "元_略称", "元_フリガナ", "元_英語表記",
                     "name", "official_name", "short_name",
-                    "alt_name", "old_name", "name:ja-Hira",
+                    "alt_name", "old_name", "branch", "name:ja-Hira",
                     "name:en", "name:ja-Latn", "要確認", "備考",
-                    "要確認の理由"])
+                    "要確認の理由", "分けられなかった name:ja-Hira",
+                    "分けられなかった name:ja-Latn", "分けられなかった name:en"])
         w.writerows(rows)
 
     print()
@@ -987,6 +1071,12 @@ def main():
     print(f"  読みと不一致で保留: {stats['読みと不一致']:,}")
     print(f"  読み未対応で検証不能: {stats['読み未対応で検証不能']:,}")
     # 列を足したときに位置がずれないよう、要確認は行を組み立てる際に数えておく
+    if stats["支店名を分けた"]:
+        print(f"支店名を branch に分けた: {stats['支店名を分けた']:,}")
+        print(f"  name:ja-Hira を同じ店名の行から切った: {stats['name:ja-Hira を同じ店名の行から切った']:,}")
+        print(f"  name:ja-Latn を読みを手がかりに切った: {stats['name:ja-Latn を読みを手がかりに切った']:,}")
+        for k in ("name:ja-Hira", "name:ja-Latn", "name:en"):
+            print(f"  {k} を分けられず出力しない: {stats[k + ' を分けられず出力しない']:,}")
     print(f"要確認              : {stats['要確認']:,}")
     if removed_use:
         print("\n除去した運営主体 上位10:")

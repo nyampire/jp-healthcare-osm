@@ -20,9 +20,9 @@ from build_osm import split_by_pref  # noqa: E402
 
 
 def rows_for(codes):
-    """(fid, pref, lat, lon, origin, tags, review, note, 残余, fixme) を作る"""
+    """(fid, pref, lat, lon, origin, tags, review, note, 残余, fixme, 分けられなかった値) を作る"""
     return [(f"T{i:03d}", c, "35.0", "139.0", "元データ",
-             {"amenity": "clinic", "name": f"施設{i}"}, "", "", "", "")
+             {"amenity": "clinic", "name": f"施設{i}"}, "", "", "", "", ["", "", ""])
             for i, c in enumerate(codes)]
 
 
