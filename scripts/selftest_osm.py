@@ -22,6 +22,13 @@
   T11 は都道府県コードが addr:province と食い違うが、addr:full は
   addr:province と同じ文字列で始まる。旧ロジックでは見逃していた食い違いで、
   検出されるのが正しい。
+
+  T12 から T18 は、薬局の name から分けた branch の検査（Issue #12）の組。
+  T12 は正しく分けた行で、切れなかったローマ字を非タグ列に残している。
+  T13 は official_name の末尾に括弧書きがある正しい行。どちらも検出しない。
+  T14 は本店を、T15 は official_name に無い支店名を branch に出している。
+  T16 は読みに支店名が残り、T17 は切れなかった英語名をタグにも出している。
+  T18 は薬局でない行に branch がある。
 """
 
 import collections
@@ -38,7 +45,10 @@ EXPECTED = {("T02", "coord_order"), ("T02", "name_missing"),
             ("T03", "addr_hierarchy"), ("T04", "addr_note_chiban"),
             ("T05", "addr_province_mismatch"),
             ("T06", "coord_cross_city"), ("T07", "coord_cross_city"),
-            ("T11", "addr_province_mismatch")}
+            ("T11", "addr_province_mismatch"),
+            ("T14", "branch_shape"), ("T15", "branch_shape"),
+            ("T16", "branch_uncut_name"), ("T17", "branch_dropped_mismatch"),
+            ("T18", "branch_shape")}
 
 
 def main():

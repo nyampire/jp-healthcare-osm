@@ -251,6 +251,104 @@
     "_id": "T11",
     "_座標の出典": "原データ"
    }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.78,
+     35.69
+    ]
+   },
+   "properties": {
+    "_id": "T12",
+    "name": "アイン薬局"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.781,
+     35.691
+    ]
+   },
+   "properties": {
+    "_id": "T13",
+    "name": "宮崎薬局"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.782,
+     35.692
+    ]
+   },
+   "properties": {
+    "_id": "T14",
+    "name": "すみれ薬局"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.783,
+     35.693
+    ]
+   },
+   "properties": {
+    "_id": "T15",
+    "name": "つつじ薬局"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.784,
+     35.694
+    ]
+   },
+   "properties": {
+    "_id": "T16",
+    "name": "レインボー薬局"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.785,
+     35.695
+    ]
+   },
+   "properties": {
+    "_id": "T17",
+    "name": "そうごう薬局"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.786,
+     35.696
+    ]
+   },
+   "properties": {
+    "_id": "T18",
+    "name": "正常な病院"
+   }
   }
  ]
 }

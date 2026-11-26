@@ -9,6 +9,7 @@
   * amenity と healthcare の値が OSM の語彙にあるか
   * name が空の地物が無いか
   * addr:province が都道府県コードと一致するか
+  * 薬局の name から分けた branch が、支店名として成り立つ形か
   * 都道府県別ファイルがあれば、行数の合計と都道府県コードの集合が全国ファイルと
     一致するか（無ければ何もしない）
   * 隣に geocoded.csv があれば、座標の理由 が 備考 の先頭の1文と一致するか
@@ -25,6 +26,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 
 from prefectures import PREF
 
@@ -39,6 +41,27 @@ HEALTHCARE_VALUES = {"hospital", "clinic", "doctor", "dentist", "pharmacy", "mid
 RE_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]*$")
 RE_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 RE_URL = re.compile(r"^https?://\S+$")
+
+# 薬局の branch の検査（Issue #12）。分け方は branch_split.py にあるが、
+# 検証は生成側と独立させるため、ここでは読み込まずに基準を書く。
+BRANCH_SEPARATORS = "・･-－‐.．、， 　"
+RE_BRANCH_NOT_PLACE = re.compile(r"本店|[0-9０-９一二三四五六七八九十]+号店|店")
+RE_PHARMACY_WORD_ONLY = re.compile(r"(?:調剤|保険)*薬局")
+# official_name の末尾の括弧書き。name から除いて old_name などに移した部分で、
+# branch はその手前で終わる（`宮崎薬局バス通り店（さきは立つさき）`）。
+RE_TRAILING_BRACKET = re.compile(r"[\s　]*[（(][^（）()]*[）)]$")
+# 支店名を切り落とせていない読みと表記。店名は「薬局」で終わるので、
+# これらの語で終わるのは支店名が残っている兆候になる。
+RE_UNCUT = {"name:ja-Hira": re.compile(r"てん$"),
+            "name:ja-Latn": re.compile(r"ten$", re.I),
+            "name:en": re.compile(r"(?<!drug)(?<!drug )(?:branch|store|shop|ten)$", re.I)}
+DROPPED_PREFIX = "分けられなかった "
+
+
+def squash(s):
+    """全角と半角をそろえ、区切りの文字を除く。"""
+    return "".join(ch for ch in unicodedata.normalize("NFKC", s)
+                   if ch not in BRANCH_SEPARATORS)
 
 
 def main():
@@ -165,6 +188,35 @@ def main():
         if w and not RE_URL.match(w):
             add("bad_website", fid, f"URL の形式が不正: {w[:60]}")
 
+        # 店名と支店名に切れなかった値は、タグに出さず非タグ列に残す。
+        # 同じタグの両方に値があるか、branch の無い行に残っていれば、
+        # 置き場の取り違えになる。
+        branch = r.get("branch", "")
+        for k in RE_UNCUT:
+            if r.get(DROPPED_PREFIX + k):
+                if not branch:
+                    add("branch_dropped_mismatch", fid,
+                        f"{DROPPED_PREFIX}{k} に値があるのに branch が空")
+                if r.get(k):
+                    add("branch_dropped_mismatch", fid,
+                        f"{DROPPED_PREFIX}{k} と {k} の両方に値がある")
+        if branch:
+            name = r.get("name", "")
+            if "pharmacy" not in (a, h):
+                add("branch_shape", fid, f"薬局でない行に branch がある: {branch}")
+            if not branch.endswith("店") or RE_BRANCH_NOT_PLACE.fullmatch(branch):
+                add("branch_shape", fid, f"branch が支店名の形でない: {branch}")
+            if branch[0] in BRANCH_SEPARATORS or (name and name[-1] in BRANCH_SEPARATORS):
+                add("branch_shape", fid, f"区切りの文字が残る: {name} / {branch}")
+            if RE_PHARMACY_WORD_ONLY.fullmatch(name):
+                add("branch_shape", fid, f"name が薬局という語だけ: {name}")
+            official = RE_TRAILING_BRACKET.sub("", r.get("official_name", ""))
+            if not squash(official).endswith(squash(branch)):
+                add("branch_shape", fid, f"branch が official_name の末尾に無い: {branch}")
+            for k, pat in RE_UNCUT.items():
+                if pat.search(r.get(k, "")):
+                    add("branch_uncut_name", fid, f"{k} に支店名が残る: {r[k]}")
+
         for k in tag_keys:
             v = r.get(k, "")
             if not v:
@@ -278,6 +330,7 @@ def main():
               "bad_website", "bad_key", "tag_too_long", "control_char", "untrimmed",
               "missing_column", "addr_hierarchy", "addr_note_chiban",
               "addr_province_mismatch", "coord_reason_mismatch",
+              "branch_dropped_mismatch", "branch_shape", "branch_uncut_name",
               "coord_cross_city", "pref_split_row_mismatch", "pref_split_missing",
               "pref_split_extra"):
         items = issues.get(k, [])

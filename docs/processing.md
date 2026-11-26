@@ -577,6 +577,24 @@ name:en        Rainbow Drugstore
 
 判定は `scripts/branch_split.py` にあり、逆テストは `scripts/selftest_branch.py` にあります。
 
+分けた結果は、`scripts/validate_osm.py` が出力だけを読んで確かめます。
+分け方を書き換えて形が崩れたときに、件数が出るようにするためです。
+今の出力では、どの検査も0件です。
+
+| 種別 | 検出する行 |
+|---|---|
+| `branch_shape` | 薬局でない行に `branch` がある |
+| `branch_shape` | `branch` が「店」で終わらないか、本店、何号店、「店」だけ |
+| `branch_shape` | `name` の末尾か `branch` の先頭に区切りの文字が残る |
+| `branch_shape` | `name` が「薬局」「調剤薬局」「保険薬局」だけ |
+| `branch_shape` | `branch` が `official_name` の末尾に無い（末尾の括弧書きは除いて比べる） |
+| `branch_uncut_name` | `branch` のある行で、`name:ja-Hira` が「てん」で、`name:ja-Latn` が `ten` で終わる |
+| `branch_uncut_name` | `branch` のある行で、`name:en` が `Branch`、`Store`、`Shop`、`ten` で終わる（`Drugstore` は除く） |
+| `branch_dropped_mismatch` | 切れなかった値の列に値があるのに、`branch` が空か、同じタグにも値がある |
+
+`branch` が2文字以下の行や、`name` が3文字以下の行は検査しません。
+`森店` や `碧薬局` のような正しい値が多く、検出しても作業者がやることが無いためです。
+
 ## 住所
 
 ### 解析を外部に任せる
